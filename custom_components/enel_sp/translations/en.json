@@ -1,0 +1,106 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Set up Enel São Paulo",
+                "description": "Enter the credentials you use on the Enel São Paulo customer area (e-mail, CPF or mobile number and password).",
+                "data": {
+                    "username": "E-mail, CPF or mobile number",
+                    "password": "Password"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Re-authenticate Enel São Paulo",
+                "description": "The portal no longer accepts your credentials. Enter the updated credentials.",
+                "data": {
+                    "username": "E-mail, CPF or mobile number",
+                    "password": "Password"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigure Enel São Paulo",
+                "description": "Update the portal credentials for this entry.",
+                "data": {
+                    "username": "E-mail, CPF or mobile number",
+                    "password": "Password"
+                }
+            }
+        },
+        "error": {
+            "auth": "The portal rejected the credentials.",
+            "connection": "Unable to connect to the Enel portal.",
+            "unknown": "Unknown error occurred."
+        },
+        "abort": {
+            "already_configured": "This account is already configured.",
+            "reauth_successful": "Re-authentication was successful.",
+            "reconfigure_successful": "Reconfiguration was successful.",
+            "unique_id_mismatch": "The account does not match the one this entry was set up with."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Enel São Paulo options",
+                "description": "Tune how often the portal is polled for new bills.",
+                "data": {
+                    "scan_interval": "Polling interval (seconds)"
+                }
+            }
+        }
+    },
+    "entity": {
+        "sensor": {
+            "bill_amount": {
+                "name": "Bill amount"
+            },
+            "bill_consumption": {
+                "name": "Bill consumption"
+            },
+            "bill_due_date": {
+                "name": "Bill due date"
+            },
+            "bill_status": {
+                "name": "Bill status",
+                "state": {
+                    "paid": "Paid",
+                    "open": "Open",
+                    "overdue": "Overdue",
+                    "unknown": "Unknown"
+                }
+            },
+            "meter_reading": {
+                "name": "Meter reading"
+            },
+            "open_bills_amount": {
+                "name": "Open bills amount"
+            },
+            "open_bills_count": {
+                "name": "Open bills"
+            },
+            "tariff_flag": {
+                "name": "Tariff flag",
+                "state": {
+                    "green": "Green",
+                    "yellow": "Yellow",
+                    "red_level_1": "Red level 1",
+                    "red_level_2": "Red level 2",
+                    "unknown": "Unknown"
+                }
+            }
+        }
+    },
+    "issues": {
+        "deprecated_api": {
+            "title": "Deprecated API endpoint in use",
+            "fix_flow": {
+                "step": {
+                    "confirm": {
+                        "title": "Switch to the supported API",
+                        "description": "The endpoint this integration was using has been deprecated. Click submit to acknowledge; update the integration's config to use the new endpoint."
+                    }
+                }
+            }
+        }
+    }
+}

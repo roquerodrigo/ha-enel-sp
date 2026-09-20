@@ -1,0 +1,22 @@
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.7.2
+    container_name: ha-enel-sp
+    restart: unless-stopped
+    ports:
+      - "8124:8123"
+    environment:
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./config:/config
+      - ./custom_components/enel_sp:/config/custom_components/enel_sp:ro
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8123/')
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "packages": {
+    ".": {
+      "package-name": "ha-enel-sp",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "custom_components/enel_sp/manifest.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "toml",
+          "path": "pyproject.toml",
+          "jsonpath": "$.project.version"
+        }
+      ],
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Funcionalidades"
+        },
+        {
+          "type": "fix",
+          "section": "Correções de bugs"
+        },
+        {
+          "type": "perf",
+          "section": "Melhorias de desempenho"
+        },
+        {
+          "type": "revert",
+          "section": "Reversões"
+        },
+        {
+          "type": "refactor",
+          "section": "Refatoração de código"
+        },
+        {
+          "type": "deps",
+          "section": "Dependências"
+        },
+        {
+          "type": "deps-dev",
+          "section": "Dependências de desenvolvimento"
+        },
+        {
+          "type": "docs",
+          "section": "Documentação"
+        },
+        {
+          "type": "build",
+          "section": "Sistema de build"
+        },
+        {
+          "type": "ci",
+          "section": "Integração contínua"
+        },
+        {
+          "type": "test",
+          "section": "Testes"
+        },
+        {
+          "type": "style",
+          "section": "Estilo"
+        },
+        {
+          "type": "chore",
+          "section": "Tarefas diversas"
+        }
+      ]
+    }
+  }
+}

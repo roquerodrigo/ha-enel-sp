@@ -1,0 +1,106 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Configurar Enel São Paulo",
+                "description": "Informe as credenciais que você usa na área do cliente da Enel São Paulo (e-mail, CPF ou celular e senha).",
+                "data": {
+                    "username": "E-mail, CPF ou celular",
+                    "password": "Senha"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Re-autenticar Enel São Paulo",
+                "description": "O portal não aceita mais suas credenciais. Informe as credenciais atualizadas.",
+                "data": {
+                    "username": "E-mail, CPF ou celular",
+                    "password": "Senha"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigurar Enel São Paulo",
+                "description": "Atualize as credenciais do portal para esta entrada.",
+                "data": {
+                    "username": "E-mail, CPF ou celular",
+                    "password": "Senha"
+                }
+            }
+        },
+        "error": {
+            "auth": "O portal rejeitou as credenciais.",
+            "connection": "Não foi possível conectar ao portal da Enel.",
+            "unknown": "Ocorreu um erro desconhecido."
+        },
+        "abort": {
+            "already_configured": "Esta conta já está configurada.",
+            "reauth_successful": "Re-autenticação concluída com sucesso.",
+            "reconfigure_successful": "Reconfiguração concluída com sucesso.",
+            "unique_id_mismatch": "A conta não corresponde à usada na configuração desta entrada."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Opções do Enel São Paulo",
+                "description": "Ajuste a frequência com que o portal é consultado por novas contas.",
+                "data": {
+                    "scan_interval": "Intervalo de consulta (segundos)"
+                }
+            }
+        }
+    },
+    "entity": {
+        "sensor": {
+            "bill_amount": {
+                "name": "Valor da conta"
+            },
+            "bill_consumption": {
+                "name": "Consumo da conta"
+            },
+            "bill_due_date": {
+                "name": "Vencimento da conta"
+            },
+            "bill_status": {
+                "name": "Situação da conta",
+                "state": {
+                    "paid": "Paga",
+                    "open": "Em aberto",
+                    "overdue": "Vencida",
+                    "unknown": "Desconhecida"
+                }
+            },
+            "meter_reading": {
+                "name": "Leitura do medidor"
+            },
+            "open_bills_amount": {
+                "name": "Valor em aberto"
+            },
+            "open_bills_count": {
+                "name": "Contas em aberto"
+            },
+            "tariff_flag": {
+                "name": "Bandeira tarifária",
+                "state": {
+                    "green": "Verde",
+                    "yellow": "Amarela",
+                    "red_level_1": "Vermelha patamar 1",
+                    "red_level_2": "Vermelha patamar 2",
+                    "unknown": "Desconhecida"
+                }
+            }
+        }
+    },
+    "issues": {
+        "deprecated_api": {
+            "title": "Endpoint da API depreciado em uso",
+            "fix_flow": {
+                "step": {
+                    "confirm": {
+                        "title": "Migrar para a API suportada",
+                        "description": "O endpoint usado por esta integração foi depreciado. Clique em enviar para confirmar; atualize a configuração da integração para usar o novo endpoint."
+                    }
+                }
+            }
+        }
+    }
+}

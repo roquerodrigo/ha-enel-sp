@@ -1,0 +1,18 @@
+{
+    "entity": {
+        "sensor": {
+            "meter_reading": {
+                "default": "mdi:counter"
+            },
+            "bill_status": {
+                "default": "mdi:file-document-check-outline"
+            },
+            "open_bills_count": {
+                "default": "mdi:file-document-multiple-outline"
+            },
+            "tariff_flag": {
+                "default": "mdi:flag-variant"
+            }
+        }
+    }
+}

@@ -1,0 +1,16 @@
+{
+  "domain": "enel_sp",
+  "name": "Enel São Paulo",
+  "codeowners": [
+    "@roquerodrigo"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "recorder"
+  ],
+  "documentation": "https://github.com/roquerodrigo/ha-enel-sp",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/roquerodrigo/ha-enel-sp/issues",
+  "version": "1.0.0"
+}
