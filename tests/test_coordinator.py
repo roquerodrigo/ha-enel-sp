@@ -18,7 +18,7 @@ from custom_components.enel_sp.exceptions import (
     EnelSpApiClientError,
 )
 
-from .conftest import ACCOUNT, ACTIVE_INSTALLATION, BILLS
+from .conftest import ACCOUNT, ACTIVE_INSTALLATION, BILLS, COMPOSITIONS
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +35,7 @@ def _make_coordinator(hass, scan_interval=timedelta(minutes=5)):
     client = AsyncMock()
     client.async_get_account = AsyncMock(return_value=ACCOUNT)
     client.async_get_bills = AsyncMock(return_value=BILLS)
+    client.async_get_bill_compositions = AsyncMock(return_value=COMPOSITIONS)
     runtime_data = type("D", (), {"client": client})()
     entry = type("E", (), {"entry_id": "eid", "runtime_data": runtime_data})()
     coord.config_entry = entry
@@ -134,3 +135,34 @@ async def test_auth_error_is_not_absorbed_by_the_grace_period(hass, sample_paylo
     client.async_get_account.side_effect = EnelSpApiClientAuthenticationError("no")
     with pytest.raises(ConfigEntryAuthFailed):
         await coord._async_update_data()
+
+
+async def test_update_data_keeps_the_bill_compositions(hass):
+    coord, client = _make_coordinator(hass)
+    payload = await coord._async_update_data()
+    data = payload.installations[ACTIVE_INSTALLATION.number]
+    assert data.compositions == COMPOSITIONS
+    client.async_get_bill_compositions.assert_awaited_once_with(ACTIVE_INSTALLATION)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [EnelSpApiClientError("down"), EnelSpApiClientAuthenticationError("no")],
+)
+async def test_composition_failure_keeps_the_last_known_compositions(
+    hass, sample_payload, error
+):
+    coord, client = _make_coordinator(hass)
+    coord.data = sample_payload
+    client.async_get_bill_compositions.side_effect = error
+    payload = await coord._async_update_data()
+    data = payload.installations[ACTIVE_INSTALLATION.number]
+    assert data.bills == BILLS
+    assert data.compositions == COMPOSITIONS
+
+
+async def test_composition_failure_without_history_yields_no_compositions(hass):
+    coord, client = _make_coordinator(hass)
+    client.async_get_bill_compositions.side_effect = EnelSpApiClientError("down")
+    payload = await coord._async_update_data()
+    assert payload.installations[ACTIVE_INSTALLATION.number].compositions == ()

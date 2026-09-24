@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
     from ..api import EnelSpApiClient
     from ..coordinator import EnelSpDataUpdateCoordinator
+    from ..tariff_coordinator import EnelSpTariffUpdateCoordinator
 
 
 @dataclass
@@ -18,4 +19,5 @@ class EnelSpData:
 
     client: EnelSpApiClient
     coordinator: EnelSpDataUpdateCoordinator
+    tariff_coordinator: EnelSpTariffUpdateCoordinator
     integration: Integration

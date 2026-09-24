@@ -9,6 +9,7 @@ from .bill_status import EnelSpBillStatus
 
 if TYPE_CHECKING:
     from .bill import EnelSpBill
+    from .bill_composition import EnelSpBillComposition
     from .installation import EnelSpInstallation
 
 
@@ -18,6 +19,7 @@ class EnelSpInstallationData:
 
     installation: EnelSpInstallation
     bills: tuple[EnelSpBill, ...]
+    compositions: tuple[EnelSpBillComposition, ...] = ()
 
     @property
     def latest_bill(self) -> EnelSpBill | None:
@@ -35,3 +37,14 @@ class EnelSpInstallationData:
     def open_amount(self) -> float:
         """Retorna o valor total das contas que aguardam pagamento."""
         return round(sum(bill.amount for bill in self.open_bills), 2)
+
+    def composition_for(self, bill: EnelSpBill) -> EnelSpBillComposition | None:
+        """Retorna a composição do valor da conta, se o portal a discriminou."""
+        return next(
+            (
+                composition
+                for composition in self.compositions
+                if (composition.year, composition.month) == (bill.year, bill.month)
+            ),
+            None,
+        )

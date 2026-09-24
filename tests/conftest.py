@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
@@ -8,10 +9,14 @@ import pytest
 
 from custom_components.enel_sp.data import (
     EnelSpAccount,
+    EnelSpAneelTariff,
+    EnelSpBandeiraTarifariaSurcharge,
     EnelSpBill,
+    EnelSpBillComposition,
     EnelSpInstallation,
     EnelSpInstallationData,
     EnelSpPayload,
+    EnelSpTariffCatalog,
     EnelSpTariffFlag,
 )
 
@@ -27,7 +32,11 @@ def mock_recorder_before_hass(async_test_recorder) -> None:
 
 
 def make_bill(
-    year: int, month: int, amount: float, consumption: float, reading: float
+    year: int,
+    month: int,
+    amount: float,
+    consumption: float,
+    reading: float,
 ) -> EnelSpBill:
     return EnelSpBill(
         year=year,
@@ -40,6 +49,8 @@ def make_bill(
         status_text="Paga",
         meter_reading=reading,
         icms=round(amount * 0.18, 2),
+        icms_rate=18.0,
+        energy_amount=0.0,
         taxes=25.32,
         interest=0.0,
     )
@@ -69,11 +80,84 @@ INACTIVE_INSTALLATION = EnelSpInstallation(
     move_in="20190101",
     move_out="20211231",
 )
-BILLS = (
-    make_bill(2026, 6, 350.10, 350, 3900),
-    make_bill(2026, 7, 420.80, 400, 4300),
-    make_bill(2026, 8, 290.70, 300, 4600),
+RESIDENTIAL_SERIES = ("B1", "Residencial", "Residencial")
+PREVIOUS_RESIDENTIAL_TARIFF = EnelSpAneelTariff(
+    subgroup="B1",
+    consumer_class="Residencial",
+    subclass="Residencial",
+    distribution_rate=0.43244,
+    energy_rate=0.29274,
+    valid_from=date(2026, 1, 1),
+    valid_until=date(2026, 7, 3),
+    resolution="RESOLUÇÃO HOMOLOGATÓRIA Nº 3.477",
 )
+CURRENT_RESIDENTIAL_TARIFF = EnelSpAneelTariff(
+    subgroup="B1",
+    consumer_class="Residencial",
+    subclass="Residencial",
+    distribution_rate=0.47242,
+    energy_rate=0.31696,
+    valid_from=date(2026, 7, 4),
+    valid_until=date(2027, 7, 3),
+    resolution="RESOLUÇÃO HOMOLOGATÓRIA Nº 3.596",
+)
+CURRENT_SOCIAL_DISCOUNT_TARIFF = EnelSpAneelTariff(
+    subgroup="B1",
+    consumer_class="Residencial",
+    subclass="Residencial Desconto Social - faixa 02",
+    distribution_rate=0.47242,
+    energy_rate=0.31696,
+    valid_from=date(2026, 7, 4),
+    valid_until=date(2027, 7, 3),
+    resolution="RESOLUÇÃO HOMOLOGATÓRIA Nº 3.596",
+)
+CURRENT_LOW_INCOME_TARIFF = EnelSpAneelTariff(
+    subgroup="B1",
+    consumer_class="Residencial",
+    subclass="Baixa Renda",
+    distribution_rate=0.30631,
+    energy_rate=0.31678,
+    valid_from=date(2026, 7, 4),
+    valid_until=date(2027, 7, 3),
+    resolution="RESOLUÇÃO HOMOLOGATÓRIA Nº 3.596",
+)
+AUGUST_BANDEIRA_TARIFARIA = EnelSpBandeiraTarifariaSurcharge(
+    month=date(2026, 8, 1), name="Amarela", rate=0.01885
+)
+SEPTEMBER_BANDEIRA_TARIFARIA = EnelSpBandeiraTarifariaSurcharge(
+    month=date(2026, 9, 1), name="Vermelha P1", rate=0.04463
+)
+CATALOG = EnelSpTariffCatalog(
+    tariffs=(
+        CURRENT_LOW_INCOME_TARIFF,
+        CURRENT_SOCIAL_DISCOUNT_TARIFF,
+        CURRENT_RESIDENTIAL_TARIFF,
+        PREVIOUS_RESIDENTIAL_TARIFF,
+    ),
+    bandeira_tarifaria_surcharges=(
+        SEPTEMBER_BANDEIRA_TARIFARIA,
+        AUGUST_BANDEIRA_TARIFARIA,
+    ),
+)
+
+BILLS = (
+    replace(make_bill(2026, 6, 350.10, 350, 3900), energy_amount=253.81),
+    replace(make_bill(2026, 7, 420.80, 400, 4300), energy_amount=310.28),
+    replace(make_bill(2026, 8, 290.70, 300, 4600), energy_amount=236.81),
+)
+AUGUST_COMPOSITION = EnelSpBillComposition(
+    year=2026,
+    month=8,
+    energy=100.00,
+    distribution=80.00,
+    transmission=20.00,
+    sector_charges=16.47,
+    losses=10.00,
+    taxes=64.25,
+    other_items=9.39,
+)
+COMPOSITIONS = (AUGUST_COMPOSITION,)
+AUGUST_PIS_COFINS_RATE = (64.25 - 52.33) / (290.72 - 52.33)
 ACCOUNT = EnelSpAccount(
     enel_id="6f1a2b3c-0000-4000-8000-000000000000",
     name="Maria Silva",
@@ -88,7 +172,9 @@ def sample_payload() -> EnelSpPayload:
         account=ACCOUNT,
         installations={
             ACTIVE_INSTALLATION.number: EnelSpInstallationData(
-                installation=ACTIVE_INSTALLATION, bills=BILLS
+                installation=ACTIVE_INSTALLATION,
+                bills=BILLS,
+                compositions=COMPOSITIONS,
             ),
         },
     )
@@ -101,6 +187,15 @@ def mock_api_client() -> Generator:
         instance.async_login = AsyncMock(return_value=ACCOUNT)
         instance.async_get_account = AsyncMock(return_value=ACCOUNT)
         instance.async_get_bills = AsyncMock(return_value=BILLS)
+        instance.async_get_bill_compositions = AsyncMock(return_value=COMPOSITIONS)
+        yield instance
+
+
+@pytest.fixture(autouse=True)
+def mock_aneel_client() -> Generator:
+    with patch("custom_components.enel_sp.EnelSpAneelApiClient") as mock_class:
+        instance = mock_class.return_value
+        instance.async_get_catalog = AsyncMock(return_value=CATALOG)
         yield instance
 
 

@@ -13,6 +13,7 @@ from custom_components.enel_sp import (
     async_remove_config_entry_device,
 )
 from custom_components.enel_sp.const import DEFAULT_SCAN_INTERVAL_SECONDS, DOMAIN
+from custom_components.enel_sp.exceptions import EnelSpApiClientError
 
 
 async def test_setup_entry_loads_successfully(hass, setup_integration):
@@ -22,7 +23,7 @@ async def test_setup_entry_loads_successfully(hass, setup_integration):
 async def test_setup_entry_creates_sensors_for_active_installations(
     hass, setup_integration
 ):
-    assert len(hass.states.async_all("sensor")) == 8
+    assert len(hass.states.async_all("sensor")) == 9
 
 
 async def test_setup_entry_registers_update_listener(hass, setup_integration):
@@ -86,6 +87,23 @@ async def test_runtime_data_populated(hass, setup_integration):
     assert setup_integration.runtime_data.client is not None
     assert setup_integration.runtime_data.coordinator is not None
     assert setup_integration.runtime_data.integration is not None
+    assert setup_integration.runtime_data.tariff_coordinator.data is not None
+
+
+async def test_setup_entry_survives_the_aneel_being_down(
+    recorder_mock, hass, mock_api_client, mock_aneel_client, enable_custom_integrations
+):
+    mock_aneel_client.async_get_catalog.side_effect = EnelSpApiClientError("down")
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"username": "user", "password": "pass"},
+        unique_id="user",
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state == ConfigEntryState.LOADED
+    assert entry.runtime_data.tariff_coordinator.data is None
 
 
 async def test_scan_interval_defaults_to_const(hass, setup_integration):

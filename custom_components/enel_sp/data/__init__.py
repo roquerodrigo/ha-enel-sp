@@ -6,12 +6,18 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from .account import EnelSpAccount
+from .aneel_tariff import EnelSpAneelTariff
+from .bandeira_tarifaria_surcharge import EnelSpBandeiraTarifariaSurcharge
 from .bill import EnelSpBill
+from .bill_composition import EnelSpBillComposition
 from .bill_status import EnelSpBillStatus
+from .composition_row import EnelSpCompositionRow
 from .config_data import EnelSpConfigData
 from .current_user import EnelSpCurrentUser, EnelSpCurrentUserResponse
 from .diagnostics_entry import EnelSpDiagnosticsEntry
 from .diagnostics_payload import EnelSpDiagnosticsPayload
+from .energy_price import EnelSpEnergyPrice
+from .energy_price_source import EnelSpEnergyPriceSource
 from .environment import EnelSpEnvironment
 from .history_row import EnelSpHistoryRow
 from .http_response import EnelSpHttpResponse
@@ -22,7 +28,9 @@ from .options_data import EnelSpOptionsData
 from .payload import EnelSpPayload
 from .runtime import EnelSpData
 from .service_response import EnelSpServiceBody, EnelSpServiceResponse
+from .tariff_catalog import EnelSpTariffCatalog
 from .tariff_flag import EnelSpTariffFlag
+from .tax_rates import EnelSpTaxRates
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -34,10 +42,16 @@ type JsonObject = Mapping[str, JsonValue]
 
 type EnelSpConfigEntry = ConfigEntry[EnelSpData]
 
+type EnelSpTariffSeries = tuple[str, str, str]
+
 __all__ = [
     "EnelSpAccount",
+    "EnelSpAneelTariff",
+    "EnelSpBandeiraTarifariaSurcharge",
     "EnelSpBill",
+    "EnelSpBillComposition",
     "EnelSpBillStatus",
+    "EnelSpCompositionRow",
     "EnelSpConfigData",
     "EnelSpConfigEntry",
     "EnelSpCurrentUser",
@@ -45,6 +59,8 @@ __all__ = [
     "EnelSpData",
     "EnelSpDiagnosticsEntry",
     "EnelSpDiagnosticsPayload",
+    "EnelSpEnergyPrice",
+    "EnelSpEnergyPriceSource",
     "EnelSpEnvironment",
     "EnelSpHistoryRow",
     "EnelSpHttpResponse",
@@ -55,7 +71,10 @@ __all__ = [
     "EnelSpPayload",
     "EnelSpServiceBody",
     "EnelSpServiceResponse",
+    "EnelSpTariffCatalog",
     "EnelSpTariffFlag",
+    "EnelSpTariffSeries",
+    "EnelSpTaxRates",
     "JsonObject",
     "JsonPrimitive",
     "JsonValue",

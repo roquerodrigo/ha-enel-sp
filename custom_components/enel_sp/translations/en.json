@@ -87,6 +87,9 @@
                     "red_level_2": "Red level 2",
                     "unknown": "Unknown"
                 }
+            },
+            "energy_price": {
+                "name": "Energy price"
             }
         }
     },

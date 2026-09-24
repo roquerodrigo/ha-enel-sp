@@ -87,6 +87,9 @@
                     "red_level_2": "Vermelha patamar 2",
                     "unknown": "Desconhecida"
                 }
+            },
+            "energy_price": {
+                "name": "Preço da energia"
             }
         }
     },

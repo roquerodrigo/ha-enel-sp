@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
+    from .composition_row import EnelSpCompositionRow
     from .history_row import EnelSpHistoryRow
 
 
@@ -15,6 +16,7 @@ class EnelSpServiceBody(TypedDict, total=False):
     E_MSG: str
     DescripcionResultado: str
     ET_HISTORICO: list[EnelSpHistoryRow] | None
+    ET_COMPOSICAO: list[EnelSpCompositionRow] | None
 
 
 class EnelSpServiceResponse(TypedDict, total=False):

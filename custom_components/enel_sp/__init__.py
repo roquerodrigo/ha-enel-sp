@@ -6,13 +6,18 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, cast
 
 from homeassistant.const import CONF_SCAN_INTERVAL, Platform
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.helpers.aiohttp_client import (
+    async_create_clientsession,
+    async_get_clientsession,
+)
 from homeassistant.loader import async_get_loaded_integration
 
+from .aneel_api import EnelSpAneelApiClient
 from .api import EnelSpApiClient
 from .const import DEFAULT_SCAN_INTERVAL_SECONDS, DOMAIN
 from .coordinator import EnelSpDataUpdateCoordinator
 from .data import EnelSpData
+from .tariff_coordinator import EnelSpTariffUpdateCoordinator
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -37,6 +42,11 @@ async def async_setup_entry(
         scan_interval=timedelta(seconds=scan_interval_seconds),
         config_entry=entry,
     )
+    tariff_coordinator = EnelSpTariffUpdateCoordinator(
+        hass=hass,
+        client=EnelSpAneelApiClient(async_get_clientsession(hass)),
+        config_entry=entry,
+    )
     # O provedor de identidade e o portal autenticam por cookies, então a
     # entry precisa de uma sessão com cookie jar próprio em vez da
     # compartilhada; o Home Assistant a desvincula quando a entry é descarregada.
@@ -48,9 +58,13 @@ async def async_setup_entry(
         ),
         integration=async_get_loaded_integration(hass, entry.domain),
         coordinator=coordinator,
+        tariff_coordinator=tariff_coordinator,
     )
 
     await coordinator.async_config_entry_first_refresh()
+    # As tarifas só refinam o preço da energia; uma ANEEL fora do ar não pode
+    # impedir o setup das contas, então a primeira atualização não é obrigatória.
+    await tariff_coordinator.async_refresh()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))

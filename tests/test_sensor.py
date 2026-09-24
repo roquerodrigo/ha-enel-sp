@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import date
 from unittest.mock import MagicMock
 
+import pytest
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -21,6 +22,7 @@ from custom_components.enel_sp.sensor.bill_consumption import (
 )
 from custom_components.enel_sp.sensor.bill_due_date import EnelSpBillDueDateSensor
 from custom_components.enel_sp.sensor.bill_status import EnelSpBillStatusSensor
+from custom_components.enel_sp.sensor.energy_price import EnelSpEnergyPriceSensor
 from custom_components.enel_sp.sensor.meter_reading import EnelSpMeterReadingSensor
 from custom_components.enel_sp.sensor.open_bills_amount import (
     EnelSpOpenBillsAmountSensor,
@@ -30,16 +32,29 @@ from custom_components.enel_sp.sensor.open_bills_count import (
 )
 from custom_components.enel_sp.sensor.tariff_flag import EnelSpTariffFlagSensor
 
-from .conftest import ACCOUNT, ACTIVE_INSTALLATION, BILLS, INACTIVE_INSTALLATION
+from .conftest import (
+    ACCOUNT,
+    ACTIVE_INSTALLATION,
+    AUGUST_PIS_COFINS_RATE,
+    BILLS,
+    CATALOG,
+    INACTIVE_INSTALLATION,
+    SEPTEMBER_BANDEIRA_TARIFARIA,
+)
 
-SENSORS_PER_INSTALLATION = 8
+SENSORS_PER_INSTALLATION = 9
 
 
-def _coordinator(payload):
+def _coordinator(payload, catalog=CATALOG):
     coordinator = MagicMock()
     coordinator.config_entry.entry_id = "eid"
+    coordinator.config_entry.runtime_data.tariff_coordinator.data = catalog
     coordinator.data = payload
     return coordinator
+
+
+def _expected_price(bandeira_tarifaria_rate: float) -> float:
+    return (0.78938 + bandeira_tarifaria_rate) / (0.82 * (1 - AUGUST_PIS_COFINS_RATE))
 
 
 def _state_by_unique_id(hass, entry, suffix: str):
@@ -265,4 +280,78 @@ def test_tariff_flag_sensor(sample_payload):
 
 def test_tariff_flag_sensor_before_first_refresh():
     sensor = EnelSpTariffFlagSensor(_coordinator(None), ACTIVE_INSTALLATION)
+    assert sensor.native_value is None
+
+
+async def test_energy_price_state(hass, setup_integration):
+    state = _state_by_unique_id(hass, setup_integration, "0123456789_energy_price")
+    assert float(state.state) == pytest.approx(
+        _expected_price(SEPTEMBER_BANDEIRA_TARIFARIA.rate), abs=1e-5
+    )
+    assert state.attributes["unit_of_measurement"] == "BRL/kWh"
+    assert state.attributes["state_class"] == "measurement"
+    assert state.attributes["tariff_source"] == "aneel"
+    assert state.attributes["tariff_class"] == "Residencial"
+    assert state.attributes["bandeira_tarifaria"] == "Vermelha P1"
+    assert state.attributes["icms_rate"] == 18.0
+    assert state.attributes["other_items"] == 9.39
+
+
+async def test_energy_price_follows_the_tariff_coordinator(hass, setup_integration):
+    tariff_coordinator = setup_integration.runtime_data.tariff_coordinator
+    tariff_coordinator.async_set_updated_data(
+        replace(CATALOG, bandeira_tarifaria_surcharges=())
+    )
+    await hass.async_block_till_done()
+    state = _state_by_unique_id(hass, setup_integration, "0123456789_energy_price")
+    assert float(state.state) == pytest.approx(_expected_price(0.0), abs=1e-5)
+    assert "bandeira_tarifaria" not in state.attributes
+
+
+def test_energy_price_sensor(sample_payload):
+    sensor = EnelSpEnergyPriceSensor(_coordinator(sample_payload), ACTIVE_INSTALLATION)
+    assert sensor.unique_id == "eid_0123456789_energy_price"
+    attributes = sensor.extra_state_attributes
+    assert attributes["tusd"] == 0.47242
+    assert attributes["te"] == 0.31696
+    assert attributes["tariff"] == 0.78938
+    assert attributes["tariff_subgroup"] == "B1"
+    assert attributes["tariff_subclass"] == "Residencial"
+    assert attributes["tariff_valid_from"] == "2026-07-04"
+    assert attributes["tariff_resolution"] == "RESOLUÇÃO HOMOLOGATÓRIA Nº 3.596"
+    assert attributes["pis_cofins_rate"] == round(AUGUST_PIS_COFINS_RATE * 100, 4)
+    assert attributes["tax_bill_year"] == 2026
+    assert attributes["tax_bill_month"] == 8
+
+
+def test_energy_price_sensor_without_the_catalog(sample_payload):
+    sensor = EnelSpEnergyPriceSensor(
+        _coordinator(sample_payload, catalog=None), ACTIVE_INSTALLATION
+    )
+    assert sensor.native_value == pytest.approx(
+        (236.81 / 300) / (0.82 * (1 - AUGUST_PIS_COFINS_RATE)), abs=1e-5
+    )
+    attributes = sensor.extra_state_attributes
+    assert attributes["tariff_source"] == "bill"
+    assert "tusd" not in attributes
+    assert "bandeira_tarifaria" not in attributes
+
+
+def test_energy_price_sensor_without_a_bill_composition():
+    payload = EnelSpPayload(
+        account=ACCOUNT,
+        installations={
+            ACTIVE_INSTALLATION.number: EnelSpInstallationData(
+                installation=ACTIVE_INSTALLATION, bills=BILLS
+            )
+        },
+    )
+    sensor = EnelSpEnergyPriceSensor(_coordinator(payload), ACTIVE_INSTALLATION)
+    assert sensor.native_value is None
+    assert "tariff_source" not in sensor.extra_state_attributes
+
+
+def test_energy_price_sensor_without_installation():
+    payload = EnelSpPayload(account=ACCOUNT, installations={})
+    sensor = EnelSpEnergyPriceSensor(_coordinator(payload), ACTIVE_INSTALLATION)
     assert sensor.native_value is None

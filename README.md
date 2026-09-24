@@ -16,7 +16,7 @@ que a conta ainda mantém em um dispositivo com as suas contas e o seu consumo.
 ## Entidades
 
 É criado um dispositivo por instalação ativa, nomeado com o apelido dado a ela
-no portal ("Casa"), cada um com oito sensores. O apelido também aparece
+no portal ("Casa"), cada um com nove sensores. O apelido também aparece
 como modelo no cartão do dispositivo, então continua visível se você renomear o
 dispositivo no Home Assistant:
 
@@ -30,6 +30,7 @@ dispositivo no Home Assistant:
 | Valor em aberto | BRL | monetary | Total das contas aguardando pagamento, incluindo as vencidas. |
 | Contas em aberto | contagem | measurement | Número de contas aguardando pagamento. |
 | Bandeira tarifária | enum | `green`, `yellow`, `red_level_1`, `red_level_2` | Bandeira tarifária em vigor para a conta. |
+| Preço da energia | BRL/kWh | `measurement` | Quanto custa cada kWh consumido agora, com bandeira, ICMS, PIS e COFINS. Veja [Preço da energia](#preço-da-energia). |
 
 Todo sensor expõe `installation_number`, `meter_serial`, `bill_year` e
 `bill_month` como atributos. As contas são publicadas mensalmente, por isso o
@@ -55,6 +56,51 @@ Escolha a estatística de energia como fonte de eletricidade em *Configurações
 Painéis → Energia*, ou plote qualquer uma das séries com um card de gráfico de
 estatísticas. Remover a integração mantém as estatísticas; exclua-as em
 *Ferramentas de desenvolvedor → Estatísticas* se não as quiser mais.
+
+## Preço da energia
+
+O sensor **Preço da energia** serve para multiplicar pela energia medida ao vivo
+(um medidor no quadro, uma tomada inteligente). Ele reproduz a conta da Enel
+item a item:
+
+```
+preço = (TUSD + TE + adicional da bandeira) / ((1 − ICMS) × (1 − PIS − COFINS))
+```
+
+O ICMS incide sobre o valor com todos os tributos, e o PIS e a COFINS sobre
+esse valor sem o ICMS, por isso os dois fatores se multiplicam. Nada é fixo na
+integração; cada parcela vem de uma fonte que acompanha a sua instalação:
+
+| Parcela | Origem |
+|---|---|
+| TUSD e TE | Tarifa de aplicação homologada pela ANEEL ([dados abertos](https://dadosabertos.aneel.gov.br/dataset/tarifas-distribuidoras-energia-eletrica)) em vigor hoje. A classe de consumo (residencial, rural, comercial…) é descoberta pelas suas contas: a conta mais recente cujo valor da energia sem tributos fecha com uma tarifa homologada revela a classe. |
+| Adicional da bandeira | Bandeira que a ANEEL acionou no mês corrente ([dados abertos](https://dadosabertos.aneel.gov.br/dataset/bandeiras-tarifarias)). |
+| ICMS | Alíquota informada na conta mais recente. |
+| PIS e COFINS | Deduzidos da conta mais recente, pela composição do valor que o portal discrimina (esses tributos mudam todo mês). |
+
+Quando nenhuma conta fecha com uma tarifa homologada, como na tarifa social,
+que é cobrada por faixas de consumo, o sensor usa a tarifa efetiva da conta
+mais recente (valor da energia sem tributos dividido pelo consumo), e o
+atributo `tariff_source` passa de `aneel` para `bill`. Os atributos trazem cada
+parcela: `tusd`, `te`, `tariff`, `bandeira_tarifaria`,
+`bandeira_tarifaria_surcharge`, `icms_rate`, `pis_cofins_rate`,
+`price_before_taxes`, a classe e a resolução da ANEEL, e a conta de onde vieram
+as alíquotas.
+
+Para ver o custo no painel de Energia, escolha o sensor do seu medidor como
+fonte de eletricidade e, em *Usar uma entidade com o preço atual*, este sensor.
+
+O preço cobre só o que a Enel cobra por kWh. Ficam de fora:
+
+- **Itens fixos da conta**, como a contribuição de iluminação pública (COSIP),
+  que é um valor por faixa de consumo do mês, e créditos ou ajustes avulsos. O
+  total deles na última conta fica no atributo `other_items`.
+- **Mudanças de faixa de ICMS no mês**: a alíquota depende do consumo total do
+  mês (em São Paulo, consumo residencial baixo é isento). O sensor usa a
+  alíquota da conta mais recente.
+- **A variação mensal do PIS e da COFINS**, que só se conhece quando a conta
+  sai. A alíquota da conta anterior costuma diferir em poucos décimos de ponto
+  percentual.
 
 ## Instalação
 
@@ -89,8 +135,17 @@ mesmos endpoints que o site usa:
    `enel-jwt-token`.
 3. `POST <gateway>/usagehistory`, para cada instalação ativa, retorna os treze
    meses faturados (`ET_HISTORICO`): valor, energia, dias, vencimento,
-   situação, tributos e a leitura do medidor. O endereço do gateway vem de
-   `/bin/enel-br/pt-saopaulo/environment`.
+   situação, tributos, a alíquota de ICMS e a leitura do medidor. O endereço
+   dos gateways vem de `/bin/enel-br/pt-saopaulo/environment`.
+4. `POST <gateway web>/validatecomposicaofatura` (`getIndicadores`) retorna a
+   composição do valor de cada conta (`ET_COMPOSICAO`): energia, distribuição,
+   transmissão, encargos, perdas, tributos e demais itens. Uma falha aqui não
+   afeta as contas; o preço da energia continua com a última composição
+   conhecida.
+
+As tarifas e as bandeiras vêm da API CKAN do portal de dados abertos da ANEEL
+(`datastore_search`), consultada a cada seis horas; se ela estiver fora do ar,
+o último catálogo continua valendo.
 
 Qualquer 401 do portal ou dos serviços significa que uma das sessões expirou; o
 cliente faz login de novo uma vez e repete a chamada. Indisponibilidades curtas
@@ -147,7 +202,8 @@ Instale os hooks de pre-commit uma vez por clone com `pre-commit install`.
 ```
 custom_components/enel_sp/
 ├── __init__.py        # async_setup_entry / unload / reload / remoção de dispositivo
-├── api.py             # cliente do portal: login SAML, usuário atual, histórico de consumo
+├── aneel_api.py       # cliente dos dados abertos da ANEEL: tarifas e bandeiras
+├── api.py             # cliente do portal: login SAML, usuário atual, histórico e composição das contas
 ├── brand/             # assets de marca
 ├── config_flow.py     # passos user / reauth / reconfigure
 ├── const.py           # DOMAIN, LOGGER, URLs do portal, ATTRIBUTION, padrões de scan interval
@@ -165,9 +221,11 @@ custom_components/enel_sp/
 ├── icons.json         # ícones das entidades indexados por translation_key
 ├── manifest.json
 ├── options_flow.py    # OptionsFlow com scan_interval
+├── pricing.py         # cálculo do preço da energia a partir das contas e da ANEEL
 ├── repairs.py         # plataforma de Repairs
 ├── sensor/            # um arquivo por classe de sensor
 ├── statistics.py      # importação das estatísticas de longo prazo
+├── tariff_coordinator.py  # DataUpdateCoordinator do catálogo da ANEEL
 └── translations/
     ├── en.json
     └── pt-BR.json

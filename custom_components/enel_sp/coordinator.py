@@ -22,7 +22,8 @@ if TYPE_CHECKING:
 
     from homeassistant.core import HomeAssistant
 
-    from .data import EnelSpConfigEntry
+    from .api import EnelSpApiClient
+    from .data import EnelSpBillComposition, EnelSpConfigEntry, EnelSpInstallation
 
 FAILURE_GRACE_PERIOD = timedelta(hours=24)
 
@@ -72,10 +73,38 @@ class EnelSpDataUpdateCoordinator(DataUpdateCoordinator["EnelSpPayload"]):
             installation.number: EnelSpInstallationData(
                 installation=installation,
                 bills=await client.async_get_bills(installation),
+                compositions=await self._fetch_compositions(client, installation),
             )
             for installation in account.active_installations
         }
         return EnelSpPayload(account=account, installations=installations)
+
+    async def _fetch_compositions(
+        self, client: EnelSpApiClient, installation: EnelSpInstallation
+    ) -> tuple[EnelSpBillComposition, ...]:
+        """
+        Carrega a composição das contas, sem deixar uma falha dela derrubar as contas.
+
+        A composição só serve para deduzir as alíquotas do preço da energia. Uma
+        falha nela, mesmo de autenticação, não pode tornar as contas indisponíveis
+        nem abrir uma reautenticação que as contas não pediram; a última composição
+        conhecida continua valendo, porque ela só muda quando sai uma conta nova.
+        """
+        try:
+            return await client.async_get_bill_compositions(installation)
+        except EnelSpApiClientError as exception:
+            LOGGER.warning(
+                "Failed to fetch the bill composition of %s: %s",
+                installation.number,
+                exception,
+            )
+        last_known_data: EnelSpPayload | None = self.data
+        last_known_installation = (
+            last_known_data.installations.get(installation.number)
+            if last_known_data is not None
+            else None
+        )
+        return last_known_installation.compositions if last_known_installation else ()
 
     def _handle_failure(self, exception: EnelSpApiClientError) -> EnelSpPayload:
         """

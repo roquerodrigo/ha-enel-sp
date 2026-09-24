@@ -47,3 +47,18 @@ async def test_diagnostics_coordinator_data_none_before_first_refresh(
 async def test_diagnostics_options_redacted_when_present(hass, setup_integration):
     diag = await async_get_config_entry_diagnostics(hass, setup_integration)
     assert isinstance(diag["entry"]["options"], dict)
+
+
+async def test_diagnostics_includes_the_tariff_catalog(hass, setup_integration):
+    diag = await async_get_config_entry_diagnostics(hass, setup_integration)
+    tariffs = diag["tariff_data"]["tariffs"]
+    assert tariffs[0]["subclass"] == "Baixa Renda"
+    assert tariffs[0]["valid_from"] == "2026-07-04"
+
+
+async def test_diagnostics_tariff_data_none_before_first_refresh(
+    hass, setup_integration
+):
+    setup_integration.runtime_data.tariff_coordinator.data = None
+    diag = await async_get_config_entry_diagnostics(hass, setup_integration)
+    assert diag["tariff_data"] is None

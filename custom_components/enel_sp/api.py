@@ -8,7 +8,7 @@ import json
 import re
 import socket
 from datetime import UTC, date, datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 from uuid import uuid4
 
 import aiohttp
@@ -24,6 +24,7 @@ from .const import (
 from .data import (
     EnelSpAccount,
     EnelSpBill,
+    EnelSpBillComposition,
     EnelSpHttpResponse,
     EnelSpInstallation,
     EnelSpTariffFlag,
@@ -38,11 +39,13 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from .data import (
+        EnelSpCompositionRow,
         EnelSpCurrentUser,
         EnelSpCurrentUserResponse,
         EnelSpEnvironment,
         EnelSpHistoryRow,
         EnelSpInstallationRow,
+        EnelSpServiceBody,
         EnelSpServiceResponse,
         JsonObject,
         JsonValue,
@@ -56,6 +59,7 @@ _INPUT_VALUE = re.compile(r"""\bvalue=(["'])(.*?)\1""", re.IGNORECASE)
 _PAGE_TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
 _SITE_CONFIG_OBJECT = re.compile(r"\{.*\}", re.DOTALL)
 _BILLING_PERIOD = re.compile(r"^(\d{4})/(\d{2})$")
+_COMPOSITION_PERIOD = re.compile(r"^(\d{2})/(\d{4})$")
 _SERVICE_DATE = re.compile(r"^(\d{4})(\d{2})(\d{2})$")
 
 _REQUEST_TIMEOUT_SECONDS = 60
@@ -66,6 +70,8 @@ _AUTH_FAILURE_QUERY = "authFailure"
 _CHANNEL = "ZINT"
 _CLIENT_IP_PLACEHOLDER = "123"
 _WEB_SYSTEM = "WEB"
+
+type _Gateway = Literal["portalSPUri", "portalWEBUri"]
 _BROWSER_HEADERS: Mapping[str, str] = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -215,15 +221,44 @@ def _bill_from_row(row: EnelSpHistoryRow) -> EnelSpBill | None:
         status_text=row.get("STATUS", "").strip(),
         meter_reading=_number(row.get("VALOR_LEIT_PER1")),
         icms=round(_number(row.get("VALOR_ICMS_FAT")), 2),
+        icms_rate=_number(row.get("VALOR_ICMS")),
+        energy_amount=round(_number(row.get("VALOR_DIAS_FAT")), 2),
         taxes=round(_number(row.get("VALOR_IMPO")), 2),
         interest=round(_number(row.get("VALOR_JUROS")), 2),
     )
+
+
+def _installation_keys(installation: EnelSpInstallation) -> JsonObject:
+    """Retorna as chaves SAP que identificam a instalação nos serviços."""
+    return {
+        "I_PARTNER": installation.partner,
+        "I_VERTRAG": installation.contract,
+        "I_VKONT": installation.contract_account,
+    }
 
 
 def _bills_from_rows(rows: list[EnelSpHistoryRow]) -> tuple[EnelSpBill, ...]:
     """Transforma as linhas do histórico em contas, da mais antiga à mais nova."""
     bills = [bill for row in rows if (bill := _bill_from_row(row)) is not None]
     return tuple(sorted(bills, key=lambda bill: (bill.year, bill.month)))
+
+
+def _composition_from_row(row: EnelSpCompositionRow) -> EnelSpBillComposition | None:
+    """Monta a composição de uma linha de ``ET_COMPOSICAO``, ou None sem período."""
+    match = _COMPOSITION_PERIOD.match(row.get("BILLING_PERIOD", ""))
+    if match is None:
+        return None
+    return EnelSpBillComposition(
+        year=int(match.group(2)),
+        month=int(match.group(1)),
+        energy=_number(row.get("ENERGIA")),
+        distribution=_number(row.get("DISTRIBUICAO")),
+        transmission=_number(row.get("TRANSMISSAO")),
+        sector_charges=_number(row.get("ENCARGOS")),
+        losses=_number(row.get("PERDAS")),
+        taxes=_number(row.get("TRIBUTOS")),
+        other_items=_number(row.get("DEMAIS_ITENS")),
+    )
 
 
 class EnelSpApiClient:
@@ -251,7 +286,7 @@ class EnelSpApiClient:
         self._session = session
         self._session_id = str(uuid4())
         self._token: str | None = None
-        self._services_url: str | None = None
+        self._environment: EnelSpEnvironment | None = None
 
     async def async_login(self) -> EnelSpAccount:
         """Faz login pelo provedor de identidade e carrega o cadastro do cliente."""
@@ -294,6 +329,19 @@ class EnelSpApiClient:
             LOGGER.debug("Services token expired; logging in again")
             await self.async_login()
             return await self._async_fetch_bills(installation)
+
+    async def async_get_bill_compositions(
+        self, installation: EnelSpInstallation
+    ) -> tuple[EnelSpBillComposition, ...]:
+        """Retorna as parcelas que compõem o valor de cada conta da instalação."""
+        if self._token is None:
+            await self.async_login()
+        try:
+            return await self._async_fetch_bill_compositions(installation)
+        except EnelSpApiClientAuthenticationError:
+            LOGGER.debug("Services token expired; logging in again")
+            await self.async_login()
+            return await self._async_fetch_bill_compositions(installation)
 
     async def _async_authenticate(self, landing: EnelSpHttpResponse) -> str:
         """Envia as credenciais ao provedor de identidade e retorna a resposta dele."""
@@ -359,25 +407,58 @@ class EnelSpApiClient:
         self, installation: EnelSpInstallation
     ) -> tuple[EnelSpBill, ...]:
         """Chama o serviço de histórico de consumo para uma instalação."""
-        body: JsonObject = {
+        body = await self._async_call_service(
+            gateway="portalSPUri",
+            path="usagehistory",
+            functionality="usagehistory",
+            request_body={
+                "I_COD_SERV": "AF",
+                "I_SSO_GUID": "GUID",
+                **_installation_keys(installation),
+            },
+            what="the usage history",
+        )
+        return _bills_from_rows(body.get("ET_HISTORICO") or [])
+
+    async def _async_fetch_bill_compositions(
+        self, installation: EnelSpInstallation
+    ) -> tuple[EnelSpBillComposition, ...]:
+        """Chama o serviço de composição das contas para uma instalação."""
+        body = await self._async_call_service(
+            gateway="portalWEBUri",
+            path="validatecomposicaofatura",
+            functionality="getIndicadores",
+            request_body={"I_COD_SERV": "HF", **_installation_keys(installation)},
+            what="the bill composition",
+        )
+        return tuple(
+            composition
+            for row in body.get("ET_COMPOSICAO") or []
+            if (composition := _composition_from_row(row)) is not None
+        )
+
+    async def _async_call_service(
+        self,
+        *,
+        gateway: _Gateway,
+        path: str,
+        functionality: str,
+        request_body: JsonObject,
+        what: str,
+    ) -> EnelSpServiceBody:
+        """Chama um serviço apoiado no SAP e retorna o corpo da resposta de sucesso."""
+        payload: JsonObject = {
             "Header": {
-                "Funcionalidad": "usagehistory",
+                "Funcionalidad": functionality,
                 "CodSistema": _WEB_SYSTEM,
                 "SistemaOrigen": _WEB_SYSTEM,
                 "FechaHora": _service_timestamp(),
             },
-            "Body": {
-                "I_CANAL": _CHANNEL,
-                "I_COD_SERV": "AF",
-                "I_SSO_GUID": "GUID",
-                "I_PARTNER": installation.partner,
-                "I_VERTRAG": installation.contract,
-                "I_VKONT": installation.contract_account,
-            },
+            "Body": {"I_CANAL": _CHANNEL, **request_body},
         }
         reply = await self._request(
-            f"{await self._async_services_url()}/usagehistory",
-            json=body,
+            f"{await self._async_gateway_url(gateway)}/{path}",
+            json=payload,
             headers={
                 "enel-jwt-token": self._token or "",
                 "SID": self._session_id,
@@ -387,36 +468,35 @@ class EnelSpApiClient:
         )
         response = cast(
             "EnelSpServiceResponse",
-            _parse_json_object(reply.text, "the usage history"),
+            _parse_json_object(reply.text, what),
         )
         service_body = response.get("Body") or {}
         if service_body.get("E_RESULT"):
             reason = service_body.get("E_MSG") or service_body.get(
                 "DescripcionResultado", ""
             )
-            msg = f"Failed to fetch the usage history: {reason}"
+            msg = f"Failed to fetch {what}: {reason}"
             raise EnelSpApiClientError(msg)
-        return _bills_from_rows(service_body.get("ET_HISTORICO") or [])
+        return service_body
 
-    async def _async_services_url(self) -> str:
-        """Resolve o gateway dos serviços SAP pela configuração do site do portal."""
-        if self._services_url is None:
+    async def _async_gateway_url(self, gateway: _Gateway) -> str:
+        """Resolve o endereço de um gateway pela configuração do site do portal."""
+        if self._environment is None:
             reply = await self._request(
                 f"{PORTAL_BASE_URL}/bin/enel-br/{PORTAL_SITE}/environment"
             )
             match = _SITE_CONFIG_OBJECT.search(reply.text)
-            environment = cast(
+            self._environment = cast(
                 "EnelSpEnvironment",
                 _parse_json_object(
                     match.group(0) if match else "", "the site configuration"
                 ),
             )
-            services_url = environment.get("portalSPUri")
-            if not services_url:
-                msg = "Failed to read the site configuration: no services gateway"
-                raise EnelSpApiClientError(msg)
-            self._services_url = services_url.rstrip("/")
-        return self._services_url
+        gateway_url = self._environment.get(gateway)
+        if not gateway_url:
+            msg = f"Failed to read the site configuration: no {gateway} gateway"
+            raise EnelSpApiClientError(msg)
+        return gateway_url.rstrip("/")
 
     async def _request(
         self,
