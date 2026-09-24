@@ -5,7 +5,7 @@
 # gerenciado; ``[tool.uv] package = false`` impede o uv de tentar
 # construí-lo/instalá-lo.
 name = "ha-enel-sp"
-version = "1.0.0"
+version = "1.1.0"
 description = "Integração do Home Assistant para a área do cliente da Enel São Paulo"
 requires-python = ">=3.14.2"
 
