@@ -10,6 +10,7 @@ from .bill_amount import EnelSpBillAmountSensor
 from .bill_consumption import EnelSpBillConsumptionSensor
 from .bill_due_date import EnelSpBillDueDateSensor
 from .bill_status import EnelSpBillStatusSensor
+from .energy_price import EnelSpEnergyPriceSensor
 from .meter_reading import EnelSpMeterReadingSensor
 from .open_bills_amount import EnelSpOpenBillsAmountSensor
 from .open_bills_count import EnelSpOpenBillsCountSensor
@@ -68,6 +69,7 @@ def _entities_for_installation(
         EnelSpBillConsumptionSensor(coordinator, installation),
         EnelSpBillDueDateSensor(coordinator, installation),
         EnelSpBillStatusSensor(coordinator, installation),
+        EnelSpEnergyPriceSensor(coordinator, installation),
         EnelSpMeterReadingSensor(coordinator, installation),
         EnelSpOpenBillsAmountSensor(coordinator, installation),
         EnelSpOpenBillsCountSensor(coordinator, installation),

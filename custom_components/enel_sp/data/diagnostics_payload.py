@@ -14,3 +14,4 @@ class EnelSpDiagnosticsPayload(TypedDict):
 
     entry: EnelSpDiagnosticsEntry
     coordinator_data: JsonObject | None
+    tariff_data: JsonObject | None

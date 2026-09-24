@@ -14,7 +14,12 @@ _OPEN_MARKERS = ("abert", "pend", "emit")
 
 @dataclass(frozen=True)
 class EnelSpBill:
-    """Conta de um mês de faturamento, com valores em BRL e energia em kWh."""
+    """
+    Conta de um mês de faturamento, com valores em BRL e energia em kWh.
+
+    ``icms_rate`` é a alíquota de ICMS em porcentagem, e ``energy_amount`` é o valor da
+    energia consumida sem tributos nem adicional de bandeira.
+    """
 
     year: int
     month: int
@@ -26,6 +31,8 @@ class EnelSpBill:
     status_text: str
     meter_reading: float
     icms: float
+    icms_rate: float
+    energy_amount: float
     taxes: float
     interest: float
 

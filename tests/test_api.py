@@ -39,6 +39,8 @@ CURRENT_USER_URL = f"{PORTAL_BASE_URL}/bin/enel-br/pt-saopaulo/currentuser"
 ENVIRONMENT_URL = f"{PORTAL_BASE_URL}/bin/enel-br/pt-saopaulo/environment"
 SERVICES_URL = "https://exp-portalsp-pro.example.cloudhub.io/api"
 USAGE_HISTORY_URL = f"{SERVICES_URL}/usagehistory"
+WEB_SERVICES_URL = "https://exp-portalweb-pro.example.cloudhub.io/api"
+COMPOSITION_URL = f"{WEB_SERVICES_URL}/validatecomposicaofatura"
 
 LOGIN_SHELL = "<html><body><app-root></app-root></body></html>"
 SAML_PAGE = (
@@ -61,7 +63,9 @@ WSO2_SAML_PAGE = (
 ENVIRONMENT_PAGE = (
     'var siteConfig = {"appRoot":"/content/x.html","portalSPUri":"'
     + SERVICES_URL
-    + '/","production":true};'
+    + '/","portalWEBUri":"'
+    + WEB_SERVICES_URL
+    + '","production":true};'
 )
 CURRENT_USER = {
     "enel_id": "6f1a2b3c-0000-4000-8000-000000000000",
@@ -109,7 +113,9 @@ def _history_row(period: str, amount: float, consumption: float, reading: float)
         "VENCIMENTO": "20260915",
         "STATUS": "Paga",
         "VALOR_LEIT_PER1": reading,
+        "VALOR_ICMS": "18",
         "VALOR_ICMS_FAT": 50.25,
+        "VALOR_DIAS_FAT": 236.81,
         "VALOR_IMPO": 20.15,
         "VALOR_JUROS": "0.68",
     }
@@ -125,6 +131,28 @@ USAGE_HISTORY = {
             _history_row("2026/06", 350.10, 350, 3900),
             _history_row("2026/07", 420.80, 400, 4300),
             {"BILLING_PERIOD": "", "VALOR_TOTAL": 1},
+        ],
+    },
+}
+
+
+BILL_COMPOSITION = {
+    "Header": {"IdPeticion": "x"},
+    "Body": {
+        "E_RESULT": "",
+        "E_MSG": "",
+        "ET_COMPOSICAO": [
+            {
+                "BILLING_PERIOD": "08/2026",
+                "ENERGIA": 84.21,
+                "DISTRIBUICAO": 62.12,
+                "TRANSMISSAO": 18.94,
+                "ENCARGOS": 59.56,
+                "TRIBUTOS": 68.94,
+                "DEMAIS_ITENS": 0.29,
+                "PERDAS": 14.39,
+            },
+            {"BILLING_PERIOD": "2026/07", "ENERGIA": 1},
         ],
     },
 }
@@ -163,6 +191,7 @@ class FakeEnel:
         self.idp_session = idp_session
         self.saml_page = saml_page
         self.usage_history = usage_history or USAGE_HISTORY
+        self.bill_composition = BILL_COMPOSITION
         self.current_user = CURRENT_USER if current_user is None else current_user
         self.portal_session = False
         self.token_valid = True
@@ -174,6 +203,7 @@ class FakeEnel:
             CURRENT_USER_URL: self._current_user,
             ENVIRONMENT_URL: self._environment,
             USAGE_HISTORY_URL: self._usage_history,
+            COMPOSITION_URL: self._bill_composition,
         }
 
     async def request(self, method, url, **kwargs):
@@ -210,6 +240,12 @@ class FakeEnel:
             self.token_valid = True
             return _response("", url, status=401)
         return _response(json_dumps(self.usage_history), url)
+
+    def _bill_composition(self, url):
+        if not self.token_valid:
+            self.token_valid = True
+            return _response("", url, status=401)
+        return _response(json_dumps(self.bill_composition), url)
 
     def calls_to(self, url: str) -> list[FakeCall]:
         return [call for call in self.calls if call.url == url]
@@ -430,6 +466,8 @@ async def test_get_bills_parses_and_sorts_the_history():
     assert latest.status is EnelSpBillStatus.PAID
     assert latest.meter_reading == 4600
     assert latest.icms == 50.25
+    assert latest.icms_rate == 18.0
+    assert latest.energy_amount == 236.81
     assert latest.taxes == 20.15
     assert latest.interest == 0.68
 
@@ -496,6 +534,65 @@ async def test_get_bills_treats_missing_history_as_no_bills():
     assert bills == ()
 
 
+async def test_get_bill_compositions_parses_the_composition():
+    compositions = await _client(FakeEnel()).async_get_bill_compositions(
+        ACTIVE_INSTALLATION
+    )
+    assert len(compositions) == 1
+    composition = compositions[0]
+    assert (composition.year, composition.month) == (2026, 8)
+    assert composition.energy == 84.21
+    assert composition.distribution == 62.12
+    assert composition.transmission == 18.94
+    assert composition.sector_charges == 59.56
+    assert composition.losses == 14.39
+    assert composition.taxes == 68.94
+    assert composition.other_items == 0.29
+    assert composition.supply_amount == 308.16
+
+
+async def test_get_bill_compositions_calls_the_web_gateway():
+    fake = FakeEnel()
+    await _client(fake).async_get_bill_compositions(ACTIVE_INSTALLATION)
+    call = fake.calls_to(COMPOSITION_URL)[0]
+    assert call.json["Header"]["Funcionalidad"] == "getIndicadores"
+    assert call.json["Body"]["I_COD_SERV"] == "HF"
+    assert call.json["Body"]["I_CANAL"] == "ZINT"
+    assert call.json["Body"]["I_VKONT"] == "123456789012"
+    assert call.headers["enel-jwt-token"] == "abc.def.ghi"
+
+
+async def test_get_bill_compositions_shares_the_site_configuration():
+    fake = FakeEnel()
+    client = _client(fake)
+    await client.async_get_bills(ACTIVE_INSTALLATION)
+    await client.async_get_bill_compositions(ACTIVE_INSTALLATION)
+    assert len(fake.calls_to(ENVIRONMENT_URL)) == 1
+
+
+async def test_get_bill_compositions_logs_in_again_when_the_token_expired():
+    fake = FakeEnel()
+    client = _client(fake)
+    await client.async_login()
+    fake.token_valid = False
+    compositions = await client.async_get_bill_compositions(ACTIVE_INSTALLATION)
+    assert len(compositions) == 1
+    assert len(fake.calls_to(COMMONAUTH_URL)) == 2
+
+
+async def test_get_bill_compositions_reports_service_errors():
+    fake = FakeEnel()
+    fake.bill_composition = {"Body": {"E_RESULT": "E", "E_MSG": "Sem faturas"}}
+    with pytest.raises(EnelSpApiClientError, match="bill composition: Sem faturas"):
+        await _client(fake).async_get_bill_compositions(ACTIVE_INSTALLATION)
+
+
+async def test_get_bill_compositions_treats_missing_rows_as_none():
+    fake = FakeEnel()
+    fake.bill_composition = {"Body": {"E_RESULT": "", "ET_COMPOSICAO": None}}
+    assert await _client(fake).async_get_bill_compositions(ACTIVE_INSTALLATION) == ()
+
+
 async def test_environment_without_gateway_raises_api_error():
     fake = FakeEnel()
     original = fake.request
@@ -506,7 +603,7 @@ async def test_environment_without_gateway_raises_api_error():
         return await original(method, url, **kwargs)
 
     fake.request = request
-    with pytest.raises(EnelSpApiClientError, match="no services gateway"):
+    with pytest.raises(EnelSpApiClientError, match="no portalSPUri gateway"):
         await _client(fake).async_get_bills(ACTIVE_INSTALLATION)
 
 

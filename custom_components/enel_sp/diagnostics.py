@@ -19,6 +19,7 @@ if TYPE_CHECKING:
         EnelSpDiagnosticsEntry,
         EnelSpDiagnosticsPayload,
         EnelSpPayload,
+        EnelSpTariffCatalog,
         JsonObject,
     )
 
@@ -67,7 +68,14 @@ async def async_get_config_entry_diagnostics(
         coordinator_data = cast(
             "JsonObject", async_redact_data(serializable, set(TO_REDACT))
         )
+    catalog: EnelSpTariffCatalog | None = entry.runtime_data.tariff_coordinator.data
+    tariff_data: JsonObject | None = None
+    if catalog is not None:
+        tariff_data = cast(
+            "JsonObject", json.loads(json.dumps(asdict(catalog), default=str))
+        )
     return {
         "entry": diag_entry,
         "coordinator_data": coordinator_data,
+        "tariff_data": tariff_data,
     }

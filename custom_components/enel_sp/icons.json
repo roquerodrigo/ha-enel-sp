@@ -12,6 +12,9 @@
             },
             "tariff_flag": {
                 "default": "mdi:flag-variant"
+            },
+            "energy_price": {
+                "default": "mdi:cash-clock"
             }
         }
     }
