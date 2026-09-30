@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.1](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.1.0...v1.1.1) (2026-09-30)
+
+
+### Dependências de desenvolvimento
+
+* **deps-dev:** bump ruff in the python-deps group ([b9a2350](https://github.com/roquerodrigo/ha-enel-sp/commit/b9a235085d9653b1bd8c14a3fb9cf89277c847c8))
+
+
+### Sistema de build
+
+* **release:** atualiza o uv.lock pelo release-please ([b0f6c4e](https://github.com/roquerodrigo/ha-enel-sp/commit/b0f6c4e374aabae670542d741af1d4ff18d33f48))
+
 ## [1.1.0](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.0.0...v1.1.0) (2026-09-24)
 
 
