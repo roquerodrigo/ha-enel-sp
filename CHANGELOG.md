@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.1.1](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.1.0...v1.1.1) (2026-10-05)
+
+
+### Dependências
+
+* **deps:** bump urllib3 from 2.7.0 to 2.8.0 ([f610fbb](https://github.com/roquerodrigo/ha-enel-sp/commit/f610fbbb754d750d0170c1368bde3dbadb2c56b6))
+* **deps:** bump virtualenv from 21.7.9 to 21.7.13 ([2452cb6](https://github.com/roquerodrigo/ha-enel-sp/commit/2452cb6f6fb3c265bd3953721aa9faf94c24df6b))
+
+
+### Dependências de desenvolvimento
+
+* **deps-dev:** bump ruff in the python-deps group ([b9a2350](https://github.com/roquerodrigo/ha-enel-sp/commit/b9a235085d9653b1bd8c14a3fb9cf89277c847c8))
+* **deps-dev:** bump the python-deps group with 2 updates ([334869a](https://github.com/roquerodrigo/ha-enel-sp/commit/334869afcbc682aae7649c1946d124f865426f89))
+
+
+### Sistema de build
+
+* **release:** atualiza o uv.lock pelo release-please ([b0f6c4e](https://github.com/roquerodrigo/ha-enel-sp/commit/b0f6c4e374aabae670542d741af1d4ff18d33f48))
+
 ## [1.1.0](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.0.0...v1.1.0) (2026-09-24)
 
 
