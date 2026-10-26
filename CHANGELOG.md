@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.1.0...v1.1.1) (2026-10-26)
+
+
+### Tarefas diversas
+
+* **release:** mantém no changelog apenas as mudanças visíveis ao usuário ([522f496](https://github.com/roquerodrigo/ha-enel-sp/commit/522f4962703a526b911848b055a736efec2500c3))
+
 ## [1.1.0](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.0.0...v1.1.0) (2026-09-24)
 
 
