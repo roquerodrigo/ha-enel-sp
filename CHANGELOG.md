@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.1](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.1.0...v1.1.1) (2026-10-31)
+
+Apenas manutenção interna, sem mudanças para quem usa o projeto.
+
 ## [1.1.0](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.0.0...v1.1.0) (2026-09-24)
 
 
