@@ -233,10 +233,10 @@ custom_components/enel_sp/
 
 ## CI
 
-Todos os workflows chamam os workflows reutilizáveis de [`roquerodrigo/workflows`](https://github.com/roquerodrigo/workflows):
+Os workflows chamam os workflows reutilizáveis de [`roquerodrigo/workflows`](https://github.com/roquerodrigo/workflows) e, na release, de [`roquerodrigo/release-autopilot`](https://github.com/roquerodrigo/release-autopilot):
 
 - **`ci.yml`** — ruff (check + format) + mypy, pytest com o gate de cobertura e a validação `hassfest` (o validador do HACS fica desligado enquanto o repositório é privado); push/PR para a `main`
-- **`release.yml`** — release-please, condicionado a uma execução verde do CI na `main`; quando uma release é criada, anexa a ela o `enel_sp.zip` que o HACS baixa (`zip_release` em `hacs.json`)
+- **`release.yml`** — release-autopilot, condicionado a uma execução verde do CI na `main`; quando uma release é criada, anexa a ela o `enel_sp.zip` que o HACS baixa (`zip_release` em `hacs.json`)
 - **`auto-assign.yml`** — atribui novas issues/PRs ao code owner
 
 ## Licença
