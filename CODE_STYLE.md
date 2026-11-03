@@ -16,8 +16,7 @@ portanto o português do Brasil é o idioma do repositório.
   - Documentação: `README.md`, `CONTRIBUTING.md`, este guia, `CLAUDE.md`, os
     demais arquivos Markdown, docstrings e comentários de código.
   - Histórico do Git: assunto e corpo dos commits, títulos e descrições de PR.
-  - Releases: notas de release e `CHANGELOG.md`, inclusive os títulos de seção
-    (`changelog-sections` em `release-please-config.json`).
+  - Releases: notas de release e `CHANGELOG.md`, inclusive os títulos de seção.
   - Comunicação pública: issues, comentários em issues e PRs, reviews, e os
     templates de issue e de PR em `.github/`.
   - Metadados: a descrição do repositório no GitHub e `description` em
@@ -303,7 +302,8 @@ repositório a cada push por meio de `hacs/action@main` (e o próprio HA executa
 - Um `README.md` na raiz do repositório é obrigatório; o HACS o exibe como a
   descrição da integração. O cabeçalho dele segue o layout abaixo.
 
-O release-please cria a tag de release a cada merge na `main`; o HACS mostra
+O [release-autopilot](https://github.com/roquerodrigo/release-autopilot) cria a tag de
+release a cada merge do pull request de release na `main`; o HACS mostra
 aos usuários as cinco releases mais recentes do GitHub, então mantenha o
 changelog fácil de pesquisar.
 
@@ -374,8 +374,8 @@ O hook executa, a cada commit, os mesmos gates de lint do CI. Só o ignore em um
 ## Conventional commits
 
 Todos os commits seguem o [Conventional Commits](https://www.conventionalcommits.org/),
-que o `release-please` interpreta para incrementar a versão e gerar o
-`CHANGELOG.md`:
+que o `release-autopilot` interpreta para incrementar a versão e escrever as notas
+da release e o `CHANGELOG.md`:
 
 | Tipo | Significado | Incremento |
 |---|---|---|
@@ -390,7 +390,7 @@ que o `release-please` interpreta para incrementar a versão e gerar o
 | `chore` | Qualquer outra coisa (raro) | nenhum |
 
 - Assunto: modo imperativo, em minúsculas, sem ponto final, **em pt-BR**. O
-  tipo e o escopo permanecem em inglês, porque é deles que o `release-please`
+  tipo e o escopo permanecem em inglês, porque é deles que o `release-autopilot`
   deriva a versão.
 - Use escopos quando forem úteis:
   `fix(sensor): mapeia valores de interface fora do enum para None`.
