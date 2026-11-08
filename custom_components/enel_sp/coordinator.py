@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
@@ -63,21 +64,54 @@ class EnelSpDataUpdateCoordinator(DataUpdateCoordinator["EnelSpPayload"]):
         await EnelSpStatisticsImporter(self.hass).async_import(
             payload.installations.values()
         )
+        await self.config_entry.runtime_data.snapshot_store.async_save(payload)
         return payload
+
+    async def async_restore_or_first_refresh(self) -> None:
+        """
+        Restaura o último payload salvo e o atualiza em segundo plano.
+
+        Sem payload salvo, faz a primeira atualização como de costume, levantando
+        ``ConfigEntryNotReady`` se o portal falhar.
+        """
+        snapshot = await self.config_entry.runtime_data.snapshot_store.async_load()
+        if snapshot is None:
+            await self.async_config_entry_first_refresh()
+            return
+        LOGGER.debug("Restored the saved portal data; refreshing in the background")
+        self.async_set_updated_data(snapshot)
+        self.config_entry.async_create_background_task(
+            self.hass,
+            self.async_refresh(),
+            name=f"{DOMAIN} refresh after restoring the saved data",
+        )
 
     async def _fetch_payload(self) -> EnelSpPayload:
         """Carrega a conta do cliente e as contas das instalações que ele mantém."""
         client = self.config_entry.runtime_data.client
         account = await client.async_get_account()
-        installations = {
-            installation.number: EnelSpInstallationData(
-                installation=installation,
-                bills=await client.async_get_bills(installation),
-                compositions=await self._fetch_compositions(client, installation),
+        installations = await asyncio.gather(
+            *(
+                self._fetch_installation(client, installation)
+                for installation in account.active_installations
             )
-            for installation in account.active_installations
-        }
-        return EnelSpPayload(account=account, installations=installations)
+        )
+        return EnelSpPayload(
+            account=account,
+            installations={data.installation.number: data for data in installations},
+        )
+
+    async def _fetch_installation(
+        self, client: EnelSpApiClient, installation: EnelSpInstallation
+    ) -> EnelSpInstallationData:
+        """Carrega as contas e a composição delas ao mesmo tempo."""
+        bills, compositions = await asyncio.gather(
+            client.async_get_bills(installation),
+            self._fetch_compositions(client, installation),
+        )
+        return EnelSpInstallationData(
+            installation=installation, bills=bills, compositions=compositions
+        )
 
     async def _fetch_compositions(
         self, client: EnelSpApiClient, installation: EnelSpInstallation

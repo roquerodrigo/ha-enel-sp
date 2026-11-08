@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import socket
 from datetime import date
@@ -284,6 +285,21 @@ async def test_login_walks_the_saml_flow_in_order():
         ACS_URL,
         CURRENT_USER_URL,
     ]
+
+
+async def test_concurrent_logins_walk_the_saml_flow_one_at_a_time():
+    fake = FakeEnel()
+    session = MagicMock()
+
+    async def _yielding_request(method, url, **kwargs):
+        await asyncio.sleep(0)
+        return await fake.request(method, url, **kwargs)
+
+    session.request = AsyncMock(side_effect=_yielding_request)
+    client = EnelSpApiClient(username="user@example.com", password="p", session=session)
+    await asyncio.gather(client.async_login(), client.async_login())
+    flow = [SAMLSSO_URL, COMMONAUTH_URL, ACS_URL, CURRENT_USER_URL]
+    assert [call.url for call in fake.calls] == flow + flow
 
 
 async def test_login_posts_the_credentials_with_the_session_key():

@@ -224,6 +224,7 @@ custom_components/enel_sp/
 ├── pricing.py         # cálculo do preço da energia a partir das contas e da ANEEL
 ├── repairs.py         # plataforma de Repairs
 ├── sensor/            # um arquivo por classe de sensor
+├── snapshot_store.py  # último payload do portal salvo em disco para o setup
 ├── statistics.py      # importação das estatísticas de longo prazo
 ├── tariff_coordinator.py  # DataUpdateCoordinator do catálogo da ANEEL
 └── translations/

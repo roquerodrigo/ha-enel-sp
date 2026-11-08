@@ -287,9 +287,15 @@ class EnelSpApiClient:
         self._session_id = str(uuid4())
         self._token: str | None = None
         self._environment: EnelSpEnvironment | None = None
+        self._login_lock = asyncio.Lock()
 
     async def async_login(self) -> EnelSpAccount:
         """Faz login pelo provedor de identidade e carrega o cadastro do cliente."""
+        async with self._login_lock:
+            return await self._async_login()
+
+    async def _async_login(self) -> EnelSpAccount:
+        """Percorre o SAML; duas chamadas concorrentes misturariam os cookies dele."""
         landing = await self._request(
             f"{ACCOUNTS_BASE_URL}/samlsso?spEntityID={SAML_SERVICE_PROVIDER}"
         )
