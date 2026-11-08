@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.1](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.1.0...v1.1.1) (2026-11-08)
+
+A inicialização da integração ficou bem mais rápida, com os últimos dados salvos e a consulta ao portal em segundo plano.
+
+### Melhorias
+
+- A inicialização usa os últimos dados salvos e consulta o portal em segundo plano, caindo de cerca de 15 para 1,2 segundo. ([#25](https://github.com/roquerodrigo/ha-enel-sp/pull/25))
+
+### Correções
+
+- A integração carrega com os dados salvos quando o portal está fora do ar na inicialização, em vez de repetir o setup. ([#25](https://github.com/roquerodrigo/ha-enel-sp/pull/25))
+- Logins simultâneos no portal deixam de interferir uns nos outros. ([#25](https://github.com/roquerodrigo/ha-enel-sp/pull/25))
+
 ## [1.1.0](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.0.0...v1.1.0) (2026-09-24)
 
 
