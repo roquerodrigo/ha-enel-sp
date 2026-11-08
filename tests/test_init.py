@@ -182,6 +182,7 @@ async def test_setup_entry_starts_from_the_saved_data_while_the_portal_is_down(
     await hass.async_block_till_done()
     assert entry.state == ConfigEntryState.LOADED
     assert entry.runtime_data.coordinator.data == sample_payload
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert len(hass.states.async_all("sensor")) == 9
     mock_api_client.async_get_account.assert_awaited()
 
