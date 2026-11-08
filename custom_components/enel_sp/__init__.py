@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from typing import TYPE_CHECKING, cast
 
@@ -17,6 +18,7 @@ from .api import EnelSpApiClient
 from .const import DEFAULT_SCAN_INTERVAL_SECONDS, DOMAIN
 from .coordinator import EnelSpDataUpdateCoordinator
 from .data import EnelSpData
+from .snapshot_store import EnelSpSnapshotStore
 from .tariff_coordinator import EnelSpTariffUpdateCoordinator
 
 if TYPE_CHECKING:
@@ -59,12 +61,15 @@ async def async_setup_entry(
         integration=async_get_loaded_integration(hass, entry.domain),
         coordinator=coordinator,
         tariff_coordinator=tariff_coordinator,
+        snapshot_store=EnelSpSnapshotStore(hass, entry.entry_id),
     )
 
-    await coordinator.async_config_entry_first_refresh()
     # As tarifas só refinam o preço da energia; uma ANEEL fora do ar não pode
     # impedir o setup das contas, então a primeira atualização não é obrigatória.
-    await tariff_coordinator.async_refresh()
+    await asyncio.gather(
+        coordinator.async_restore_or_first_refresh(),
+        tariff_coordinator.async_refresh(),
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
@@ -78,6 +83,14 @@ async def async_unload_entry(
 ) -> bool:
     """Trata a remoção de uma entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(
+    hass: HomeAssistant,
+    entry: EnelSpConfigEntry,
+) -> None:
+    """Apaga os dados do portal salvos para a entry removida."""
+    await EnelSpSnapshotStore(hass, entry.entry_id).async_remove()
 
 
 async def async_reload_entry(

@@ -14,6 +14,7 @@ from custom_components.enel_sp import (
 )
 from custom_components.enel_sp.const import DEFAULT_SCAN_INTERVAL_SECONDS, DOMAIN
 from custom_components.enel_sp.exceptions import EnelSpApiClientError
+from custom_components.enel_sp.snapshot_store import EnelSpSnapshotStore
 
 
 async def test_setup_entry_loads_successfully(hass, setup_integration):
@@ -156,3 +157,53 @@ async def test_remove_device_allows_anything_before_the_first_refresh(
     )
     assert device is not None
     assert await async_remove_config_entry_device(hass, setup_integration, device)
+
+
+async def test_setup_entry_saves_the_portal_data(hass, hass_storage, setup_integration):
+    assert f"{DOMAIN}.{setup_integration.entry_id}" in hass_storage
+
+
+async def test_setup_entry_starts_from_the_saved_data_while_the_portal_is_down(
+    recorder_mock,
+    hass,
+    mock_api_client,
+    sample_payload,
+    enable_custom_integrations,
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"username": "user", "password": "pass"},
+        unique_id="user",
+    )
+    entry.add_to_hass(hass)
+    await EnelSpSnapshotStore(hass, entry.entry_id).async_save(sample_payload)
+    mock_api_client.async_get_account.side_effect = EnelSpApiClientError("down")
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state == ConfigEntryState.LOADED
+    assert entry.runtime_data.coordinator.data == sample_payload
+    assert len(hass.states.async_all("sensor")) == 9
+    mock_api_client.async_get_account.assert_awaited()
+
+
+async def test_setup_entry_without_saved_data_retries_while_the_portal_is_down(
+    recorder_mock, hass, mock_api_client, enable_custom_integrations
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"username": "user", "password": "pass"},
+        unique_id="user",
+    )
+    entry.add_to_hass(hass)
+    mock_api_client.async_get_account.side_effect = EnelSpApiClientError("down")
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state == ConfigEntryState.SETUP_RETRY
+
+
+async def test_remove_entry_deletes_the_saved_data(
+    hass, hass_storage, setup_integration
+):
+    await hass.config_entries.async_remove(setup_integration.entry_id)
+    await hass.async_block_till_done()
+    assert f"{DOMAIN}.{setup_integration.entry_id}" not in hass_storage

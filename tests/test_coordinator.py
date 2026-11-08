@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
@@ -36,7 +37,9 @@ def _make_coordinator(hass, scan_interval=timedelta(minutes=5)):
     client.async_get_account = AsyncMock(return_value=ACCOUNT)
     client.async_get_bills = AsyncMock(return_value=BILLS)
     client.async_get_bill_compositions = AsyncMock(return_value=COMPOSITIONS)
-    runtime_data = type("D", (), {"client": client})()
+    snapshot_store = AsyncMock()
+    snapshot_store.async_load = AsyncMock(return_value=None)
+    runtime_data = type("D", (), {"client": client, "snapshot_store": snapshot_store})()
     entry = type("E", (), {"entry_id": "eid", "runtime_data": runtime_data})()
     coord.config_entry = entry
     return coord, client
@@ -166,3 +169,42 @@ async def test_composition_failure_without_history_yields_no_compositions(hass):
     client.async_get_bill_compositions.side_effect = EnelSpApiClientError("down")
     payload = await coord._async_update_data()
     assert payload.installations[ACTIVE_INSTALLATION.number].compositions == ()
+
+
+async def test_update_data_saves_the_payload(hass):
+    coord, _ = _make_coordinator(hass)
+    payload = await coord._async_update_data()
+    snapshot_store = coord.config_entry.runtime_data.snapshot_store
+    snapshot_store.async_save.assert_awaited_once_with(payload)
+
+
+async def test_update_data_does_not_save_the_last_known_payload(hass, sample_payload):
+    coord, client = _make_coordinator(hass)
+    coord.data = sample_payload
+    client.async_get_account.side_effect = EnelSpApiClientError("blip")
+    await coord._async_update_data()
+    coord.config_entry.runtime_data.snapshot_store.async_save.assert_not_awaited()
+
+
+async def test_update_data_fetches_bills_and_compositions_concurrently(hass):
+    coord, client = _make_coordinator(hass)
+    both_started = asyncio.Event()
+    started: list[str] = []
+
+    def _waiting_for_the_other(name, result):
+        async def _call(_installation):
+            started.append(name)
+            if len(started) == 2:
+                both_started.set()
+            await asyncio.wait_for(both_started.wait(), timeout=1)
+            return result
+
+        return _call
+
+    client.async_get_bills.side_effect = _waiting_for_the_other("bills", BILLS)
+    client.async_get_bill_compositions.side_effect = _waiting_for_the_other(
+        "compositions", COMPOSITIONS
+    )
+    payload = await coord._async_update_data()
+    assert sorted(started) == ["bills", "compositions"]
+    assert payload.installations[ACTIVE_INSTALLATION.number].bills == BILLS
