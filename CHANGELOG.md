@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.2](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.1.1...v1.1.2) (2026-11-24)
+
+### Melhorias
+
+- No diagnóstico, as instalações passam a ser listadas em vez de indexadas pelo número da instalação. ([#32](https://github.com/roquerodrigo/ha-enel-sp/pull/32))
+
+### Correções
+
+- O diagnóstico deixou de expor em claro o login da conta, o número da instalação e as datas de entrada e saída do imóvel; esses dados agora são redigidos. ([#32](https://github.com/roquerodrigo/ha-enel-sp/pull/32))
+
 ## [1.1.1](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.1.0...v1.1.1) (2026-11-08)
 
 A inicialização da integração ficou bem mais rápida, com os últimos dados salvos e a consulta ao portal em segundo plano.
