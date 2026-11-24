@@ -19,7 +19,7 @@ async def test_diagnostics_includes_entry_metadata(hass, setup_integration):
     diag = await async_get_config_entry_diagnostics(hass, setup_integration)
     assert diag["entry"]["domain"] == "enel_sp"
     assert diag["entry"]["version"] == 1
-    assert "title" in diag["entry"]
+    assert diag["entry"]["title"] == "**REDACTED**"
 
 
 async def test_diagnostics_serializes_and_redacts_the_payload(hass, setup_integration):
@@ -28,9 +28,9 @@ async def test_diagnostics_serializes_and_redacts_the_payload(hass, setup_integr
     assert data["account"]["enel_id"] == "**REDACTED**"
     assert data["account"]["name"] == "**REDACTED**"
     assert data["account"]["tariff_flag"] == "yellow"
-    installation = data["installations"]["0123456789"]
+    installation = data["installations"][0]
     assert installation["installation"]["address"] == "**REDACTED**"
-    assert installation["installation"]["number"] == "0123456789"
+    assert installation["installation"]["number"] == "**REDACTED**"
     latest = installation["bills"][-1]
     assert latest["amount"] == 290.70
     assert latest["due_date"] == "2026-08-10"
@@ -62,3 +62,10 @@ async def test_diagnostics_tariff_data_none_before_first_refresh(
     setup_integration.runtime_data.tariff_coordinator.data = None
     diag = await async_get_config_entry_diagnostics(hass, setup_integration)
     assert diag["tariff_data"] is None
+
+
+async def test_diagnostics_never_carries_the_installation_number(
+    hass, setup_integration
+):
+    diag = await async_get_config_entry_diagnostics(hass, setup_integration)
+    assert "0123456789" not in repr(diag)

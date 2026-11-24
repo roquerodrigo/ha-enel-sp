@@ -10,8 +10,6 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from homeassistant.core import HomeAssistant
 
     from .data import (
@@ -23,10 +21,15 @@ if TYPE_CHECKING:
         JsonObject,
     )
 
+# O título da entrada é o login, e o número identifica a unidade consumidora.
 TO_REDACT: frozenset[str] = frozenset(
     {
         CONF_PASSWORD,
         CONF_USERNAME,
+        "title",
+        "number",
+        "move_in",
+        "move_out",
         "enel_id",
         "name",
         "address",
@@ -44,27 +47,27 @@ async def async_get_config_entry_diagnostics(
     entry: EnelSpConfigEntry,
 ) -> EnelSpDiagnosticsPayload:
     """Retorna o diagnóstico de uma config entry."""
-    redacted_data = cast(
-        "Mapping[str, str]",
-        async_redact_data(dict(entry.data), set(TO_REDACT)),
+    diag_entry = cast(
+        "EnelSpDiagnosticsEntry",
+        async_redact_data(
+            {
+                "title": entry.title,
+                "version": entry.version,
+                "domain": entry.domain,
+                "data": dict(entry.data),
+                "options": dict(entry.options),
+            },
+            set(TO_REDACT),
+        ),
     )
-    redacted_options = cast(
-        "Mapping[str, str | int]",
-        async_redact_data(dict(entry.options), set(TO_REDACT)),
-    )
-    diag_entry: EnelSpDiagnosticsEntry = {
-        "title": entry.title,
-        "version": entry.version,
-        "domain": entry.domain,
-        "data": redacted_data,
-        "options": redacted_options,
-    }
     payload: EnelSpPayload | None = entry.runtime_data.coordinator.data
     coordinator_data: JsonObject | None = None
     if payload is not None:
         # Datas e enums não são JSON por si sós; a ida e volta pelo encoder com
         # ``default=str`` os transforma em texto de uma vez.
         serializable = json.loads(json.dumps(asdict(payload), default=str))
+        # As instalações são indexadas pelo número, e a redação só apaga valores.
+        serializable["installations"] = list(serializable["installations"].values())
         coordinator_data = cast(
             "JsonObject", async_redact_data(serializable, set(TO_REDACT))
         )
