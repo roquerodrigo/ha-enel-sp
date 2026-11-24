@@ -314,39 +314,32 @@ changelog fácil de pesquisar.
 
 ## Cabeçalho do README
 
-Todo repositório abre o `README.md` com o mesmo cabeçalho, exatamente nesta
-ordem: **título → badges → link do HACS → separador `---` → o restante do
-documento.**
+O `README.md` abre com o título (o `name` do `hacs.json`) e, logo abaixo, o
+bloco de badges e o botão do Marketplace entre os marcadores
+`ha-marketplace:exclude`, que escondem o bloco na página do repositório dentro
+do Home Assistant:
 
 ```markdown
-# <Title>
+# Enel São Paulo
 
+<!-- ha-marketplace:exclude-start -->
 [![CI](https://github.com/roquerodrigo/<repo>/actions/workflows/ci.yml/badge.svg)](https://github.com/roquerodrigo/<repo>/actions/workflows/ci.yml)
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![GitHub release](https://img.shields.io/github/v/release/roquerodrigo/<repo>)](https://github.com/roquerodrigo/<repo>/releases/latest)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/roquerodrigo)
 
-[![Open your Home Assistant instance and open the repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=roquerodrigo&repository=<repo>&category=integration)
-
----
+[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=roquerodrigo&repository=<repo>&category=integration)
+<!-- ha-marketplace:exclude-end -->
 ```
 
 - `owner=` é sempre `roquerodrigo`; `repository=` é o nome do repositório.
-- `category=integration` para uma integração; `category=plugin` para um
-  repositório de card Lovelace.
-- O link do HACS é um parágrafo próprio, separado do bloco de badges por uma
-  linha em branco. A linha de badges e o botão "Open your Home Assistant
-  instance" são coisas diferentes e não devem ficar juntos.
-- Preserve os badges que o repositório já tem e não invente novos; todos ficam
-  **antes** do link do HACS.
-- O `---` imediatamente após o link do HACS é o separador do cabeçalho. Um
-  README que já usa `---` mais abaixo mantém esses como quebras de seção — não
-  adicione um segundo separador ao cabeçalho.
-
-**Um repositório privado não recebe o link do HACS.** O `my.home-assistant.io`
-resolve o destino pela API pública do GitHub, então em um repositório privado o
-botão leva a algo que o HACS não consegue instalar. É o mesmo motivo pelo qual
-as checagens de catálogo pulam esses repositórios. Publique o
-título, os badges e o separador, e adicione o link quando — e somente quando —
-o repositório se tornar público.
+- O botão usa a imagem do Marketplace com o redirecionamento
+  `hacs_repository`, que abre o HACS antes do Home Assistant 2026.11 e o
+  Marketplace a partir dele.
+- Não há separador `---` depois do cabeçalho: no Marketplace os badges somem,
+  e a linha abriria a página.
+- Instalação, Contribuindo e Licença também ficam entre os marcadores. Os
+  títulos não ganham âncoras no Marketplace, então o texto visível nunca
+  depende de um link `#âncora`.
 
 ## Quality scale
 

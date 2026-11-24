@@ -1,245 +1,284 @@
-# Enel São Paulo para Home Assistant
+# Enel São Paulo
 
+<!-- ha-marketplace:exclude-start -->
 [![CI](https://github.com/roquerodrigo/ha-enel-sp/actions/workflows/ci.yml/badge.svg)](https://github.com/roquerodrigo/ha-enel-sp/actions/workflows/ci.yml)
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![GitHub release](https://img.shields.io/github/v/release/roquerodrigo/ha-enel-sp)](https://github.com/roquerodrigo/ha-enel-sp/releases/latest)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/roquerodrigo)
 
-[![Open your Home Assistant instance and open the repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=roquerodrigo&repository=ha-enel-sp&category=integration)
+[![Open your Home Assistant instance and open a repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=roquerodrigo&repository=ha-enel-sp&category=integration)
+<!-- ha-marketplace:exclude-end -->
 
----
+Acompanhe a sua conta de luz da Enel São Paulo no Home Assistant: o valor, o
+consumo, o vencimento, se ela já foi paga e a bandeira tarifária do mês. Os
+últimos meses faturados entram no painel de Energia, e um sensor calcula
+quanto custa cada kWh agora, com bandeira e tributos, para você ver o custo do
+que consome em tempo real. Os dados vêm da área do cliente da
+[Enel São Paulo](https://www.enel.com.br/pt-saopaulo.html), com o mesmo login
+que você usa no site.
 
-Integração custom para o [Home Assistant](https://www.home-assistant.io/) que
-acessa a área do cliente da [Enel Distribuição São Paulo](https://www.enel.com.br/pt-saopaulo.html),
-a distribuidora de energia elétrica da região metropolitana de São Paulo. Ela
-faz login com as mesmas credenciais usadas no site e transforma cada instalação
-que a conta ainda mantém em um dispositivo com as suas contas e o seu consumo.
+## Recursos
 
-## Entidades
+- Veja o valor, o consumo e o vencimento da conta mais recente, e se ela está
+  paga, em aberto ou vencida.
+- Saiba quanto você deve no total e quantas contas aguardam pagamento, e crie
+  automações que lembram você antes do vencimento.
+- Acompanhe a bandeira tarifária em vigor.
+- Tenha no painel de Energia o consumo e o valor de cada mês faturado,
+  inclusive dos meses anteriores à instalação da integração.
+- Use o sensor Preço da energia com um medidor seu (no quadro ou numa tomada
+  inteligente) para ver no painel de Energia quanto custa o que você consome
+  agora.
+- Cada unidade consumidora da sua conta vira um dispositivo próprio, com o
+  apelido que você deu a ela no site da Enel.
 
-É criado um dispositivo por instalação ativa, nomeado com o apelido dado a ela
-no portal ("Casa"), cada um com nove sensores. O apelido também aparece
-como modelo no cartão do dispositivo, então continua visível se você renomear o
-dispositivo no Home Assistant:
+## Requisitos
 
-| Sensor | Unidade | Classe | O que informa |
-|---|---|---|---|
-| Valor da conta | BRL | monetary, `total` | Valor da conta mais recente; `last_reset` é o primeiro dia do mês de faturamento. Os atributos trazem ICMS, tributos, juros e o número de dias. |
-| Consumo da conta | kWh | energy, `total` | Energia faturada no mês mais recente, com a média diária como atributo. |
-| Vencimento da conta | timestamp | timestamp | Data de vencimento da conta mais recente, à meia-noite local, para que o front-end mostre quanto tempo falta. |
-| Situação da conta | enum | `paid`, `open`, `overdue`, `unknown` | Situação de pagamento da conta mais recente; o texto original do portal fica no atributo `portal_status`. |
-| Leitura do medidor | kWh | energy, `total_increasing` | Valor do contador lido para a conta mais recente. Use-o como fonte de eletricidade no painel de Energia. |
-| Valor em aberto | BRL | monetary | Total das contas aguardando pagamento, incluindo as vencidas. |
-| Contas em aberto | contagem | measurement | Número de contas aguardando pagamento. |
-| Bandeira tarifária | enum | `green`, `yellow`, `red_level_1`, `red_level_2` | Bandeira tarifária em vigor para a conta. |
-| Preço da energia | BRL/kWh | `measurement` | Quanto custa cada kWh consumido agora, com bandeira, ICMS, PIS e COFINS. Veja [Preço da energia](#preço-da-energia). |
+- Home Assistant 2026.7.2 ou mais recente.
+- Um cadastro na área do cliente da Enel São Paulo: e-mail, CPF ou celular, e
+  a senha.
+- Acesso do Home Assistant à internet.
 
-Todo sensor expõe `installation_number`, `meter_serial`, `bill_year` e
-`bill_month` como atributos. As contas são publicadas mensalmente, por isso o
-intervalo padrão de consulta é de uma hora (configurável nas opções da
-integração).
-
-## Histórico e o painel de Energia
-
-O estado de um sensor carrega apenas a conta mais recente, então os treze meses
-faturados que o portal mantém são importados para as estatísticas de longo
-prazo do Home Assistant. Cada instalação recebe duas estatísticas externas,
-nomeadas com a instalação e o sensor correspondente ("Casa Consumo da
-conta"):
-
-| Id da estatística | Unidade | O que guarda |
-|---|---|---|
-| `enel_sp:<installation>_energy` | kWh | Energia de cada mês faturado, com a leitura do medidor como estado |
-| `enel_sp:<installation>_cost` | BRL | Valor de cada mês faturado |
-
-O valor de cada mês é registrado no primeiro dia do mês de faturamento. As
-atualizações seguintes só acrescentam meses mais novos que o último armazenado.
-Escolha a estatística de energia como fonte de eletricidade em *Configurações →
-Painéis → Energia*, ou plote qualquer uma das séries com um card de gráfico de
-estatísticas. Remover a integração mantém as estatísticas; exclua-as em
-*Ferramentas de desenvolvedor → Estatísticas* se não as quiser mais.
-
-## Preço da energia
-
-O sensor **Preço da energia** serve para multiplicar pela energia medida ao vivo
-(um medidor no quadro, uma tomada inteligente). Ele reproduz a conta da Enel
-item a item:
-
-```
-preço = (TUSD + TE + adicional da bandeira) / ((1 − ICMS) × (1 − PIS − COFINS))
-```
-
-O ICMS incide sobre o valor com todos os tributos, e o PIS e a COFINS sobre
-esse valor sem o ICMS, por isso os dois fatores se multiplicam. Nada é fixo na
-integração; cada parcela vem de uma fonte que acompanha a sua instalação:
-
-| Parcela | Origem |
-|---|---|
-| TUSD e TE | Tarifa de aplicação homologada pela ANEEL ([dados abertos](https://dadosabertos.aneel.gov.br/dataset/tarifas-distribuidoras-energia-eletrica)) em vigor hoje. A classe de consumo (residencial, rural, comercial…) é descoberta pelas suas contas: a conta mais recente cujo valor da energia sem tributos fecha com uma tarifa homologada revela a classe. |
-| Adicional da bandeira | Bandeira que a ANEEL acionou no mês corrente ([dados abertos](https://dadosabertos.aneel.gov.br/dataset/bandeiras-tarifarias)). |
-| ICMS | Alíquota informada na conta mais recente. |
-| PIS e COFINS | Deduzidos da conta mais recente, pela composição do valor que o portal discrimina (esses tributos mudam todo mês). |
-
-Quando nenhuma conta fecha com uma tarifa homologada, como na tarifa social,
-que é cobrada por faixas de consumo, o sensor usa a tarifa efetiva da conta
-mais recente (valor da energia sem tributos dividido pelo consumo), e o
-atributo `tariff_source` passa de `aneel` para `bill`. Os atributos trazem cada
-parcela: `tusd`, `te`, `tariff`, `bandeira_tarifaria`,
-`bandeira_tarifaria_surcharge`, `icms_rate`, `pis_cofins_rate`,
-`price_before_taxes`, a classe e a resolução da ANEEL, e a conta de onde vieram
-as alíquotas.
-
-Para ver o custo no painel de Energia, escolha o sensor do seu medidor como
-fonte de eletricidade e, em *Usar uma entidade com o preço atual*, este sensor.
-
-O preço cobre só o que a Enel cobra por kWh. Ficam de fora:
-
-- **Itens fixos da conta**, como a contribuição de iluminação pública (COSIP),
-  que é um valor por faixa de consumo do mês, e créditos ou ajustes avulsos. O
-  total deles na última conta fica no atributo `other_items`.
-- **Mudanças de faixa de ICMS no mês**: a alíquota depende do consumo total do
-  mês (em São Paulo, consumo residencial baixo é isento). O sensor usa a
-  alíquota da conta mais recente.
-- **A variação mensal do PIS e da COFINS**, que só se conhece quando a conta
-  sai. A alíquota da conta anterior costuma diferir em poucos décimos de ponto
-  percentual.
-
+<!-- ha-marketplace:exclude-start -->
 ## Instalação
 
-### HACS
+### Marketplace do Home Assistant (recomendado)
 
-1. Adicione `https://github.com/roquerodrigo/ha-enel-sp` como repositório
-   personalizado do tipo *Integração*, ou clique no badge acima.
-2. Instale **Enel São Paulo** e reinicie o Home Assistant.
-3. Vá em *Configurações → Dispositivos e serviços → Adicionar integração*,
-   escolha **Enel São Paulo** e informe o e-mail, CPF ou celular e a senha
-   usados na área do cliente.
+1. Selecione o botão **Open your Home Assistant instance** acima, ou vá em
+   **Configurações → Marketplace**, selecione **Adicionar a partir de link**,
+   informe `https://github.com/roquerodrigo/ha-enel-sp` em
+   **Link do GitHub** e selecione **Adicionar**.
+2. Selecione **Instalar**.
+3. Reinicie o Home Assistant.
+
+O Marketplace vem com o Home Assistant 2026.11 e versões posteriores. Nas
+versões anteriores, adicione este repositório ao HACS como repositório
+personalizado do tipo **Integração** e instale a partir de lá.
 
 ### Manual
 
-Copie `custom_components/enel_sp/` para o diretório `custom_components/` da
-configuração do seu Home Assistant e reinicie.
+1. Baixe o `enel_sp.zip` da
+   [última release](https://github.com/roquerodrigo/ha-enel-sp/releases/latest).
+2. Extraia o conteúdo em `config/custom_components/enel_sp/`.
+3. Reinicie o Home Assistant.
+<!-- ha-marketplace:exclude-end -->
+
+## Configuração
+
+Vá em **Configurações → Dispositivos e serviços → Adicionar integração**,
+procure **Enel São Paulo** e preencha o formulário.
+
+| Campo                  | O que informar                                      |
+|------------------------|-----------------------------------------------------|
+| E-mail, CPF ou celular | O login que você usa na área do cliente da Enel     |
+| Senha                  | A senha da área do cliente                          |
+
+A primeira configuração pode levar alguns segundos, porque o site da Enel
+demora para responder. Cada login só pode ser adicionado uma vez.
+
+Para trocar o login ou a senha depois, abra a integração e selecione
+**Reconfigurar**. O login precisa ser o mesmo usado na configuração (o mesmo
+e-mail, CPF ou celular). Se você mudar a senha no site da Enel, o Home
+Assistant pede a nova.
+
+## Opções
+
+Abra a integração e selecione **Configurar**.
+
+| Opção                            | Padrão          | Valores     | Efeito                                                |
+|----------------------------------|-----------------|-------------|-------------------------------------------------------|
+| Intervalo de consulta (segundos) | 3600 (uma hora) | 300 ou mais | De quanto em quanto tempo o site da Enel é consultado |
+
+As contas saem uma vez por mês, então uma hora basta para ver uma conta nova
+ou um pagamento no mesmo dia.
+
+## Entidades
+
+Cada unidade consumidora ativa da conta vira um dispositivo, com o apelido
+dado a ela no site da Enel (ou o número da instalação, se ela não tiver
+apelido). O apelido também aparece como modelo do dispositivo, então continua
+visível se você o renomear no Home Assistant. Todas as entidades são sensores.
+
+| Entidade            | Unidade ou estados                                   | O que mostra                                                  |
+|---------------------|------------------------------------------------------|---------------------------------------------------------------|
+| Valor da conta      | BRL                                                  | O valor da conta mais recente                                 |
+| Consumo da conta    | kWh                                                  | A energia faturada na conta mais recente                      |
+| Vencimento da conta | Data e hora                                          | O vencimento da conta mais recente                            |
+| Situação da conta   | Paga, Em aberto, Vencida ou Desconhecida             | Se a conta mais recente já foi paga                           |
+| Leitura do medidor  | kWh                                                  | O número lido no medidor para a conta mais recente            |
+| Valor em aberto     | BRL                                                  | A soma das contas que ainda não constam como pagas            |
+| Contas em aberto    | Número de contas                                     | Quantas contas ainda não constam como pagas                   |
+| Bandeira tarifária  | Verde, Amarela, Vermelha patamar 1, Vermelha patamar 2 ou Desconhecida | A bandeira em vigor informada pela Enel     |
+| Preço da energia    | BRL/kWh                                              | Quanto custa cada kWh consumido agora, com bandeira e tributos |
+
+Os atributos trazem mais detalhes, úteis em templates e automações:
+
+- Todos os sensores: `installation_number`, `meter_serial` e o mês da conta
+  (`bill_year`, `bill_month`).
+- Valor da conta: `icms`, `taxes` (tributos), `interest` (juros) e `days`
+  (dias faturados).
+- Consumo da conta: `days` e `daily_average` (média diária em kWh).
+- Situação da conta: `portal_status`, o texto exatamente como o site da Enel
+  mostra.
+- Preço da energia: cada parcela do preço, descrita em Como funciona, abaixo.
+
+Uma unidade consumidora nova na sua conta aparece sozinha, sem reiniciar. Uma
+que deixa de aparecer no site da Enel fica indisponível, e você pode excluir o
+dispositivo dela.
+
+### Histórico das contas
+
+Os sensores mostram só a conta mais recente. Os meses anteriores que a Enel
+mantém (em geral, treze) entram nas estatísticas de longo prazo do Home
+Assistant, em duas séries por unidade consumidora, com o nome no idioma do
+Home Assistant:
+
+| Série                          | Unidade | O que guarda                     |
+|--------------------------------|---------|----------------------------------|
+| `<apelido> Consumo da conta`   | kWh     | A energia faturada em cada mês   |
+| `<apelido> Valor da conta`     | BRL     | O valor de cada conta            |
+
+Cada mês fica registrado no primeiro dia do mês da conta, e os meses novos
+entram conforme as contas saem. Você pode usar as duas séries no painel de
+Energia ou num card **Gráfico de estatísticas**.
+
+As séries continuam no Home Assistant se você remover a integração. Para
+apagá-las, vá em **Configurações → Ferramentas → Estatísticas**.
+
+### Painel de Energia
+
+Vá em **Configurações → Energia** e, em **Rede elétrica**, selecione
+**Adicionar conexão à rede**. Há dois jeitos de usar a integração ali.
+
+Sem medidor próprio, com o consumo das contas:
+
+1. Em **Energia importada da rede**, escolha a série `<apelido> Consumo da
+   conta`.
+2. Em **Rastreamento de custos**, escolha **Usar uma entidade que rastreie os
+   custos totais** e, em **Entidade com os custos totais**, a série
+   `<apelido> Valor da conta`.
+
+O painel passa a mostrar o consumo e o valor de cada mês, inclusive dos meses
+anteriores à instalação da integração. Como a Enel informa um número por mês,
+o painel não mostra o consumo por dia ou por hora.
+
+Com um medidor próprio, que mede o consumo ao vivo:
+
+1. Em **Energia importada da rede**, escolha o sensor de energia do seu
+   medidor.
+2. Em **Rastreamento de custos**, escolha **Usar uma entidade com preço
+   atual** e, em **Entidade com o preço atual**, o sensor Preço da energia.
+
+O painel passa a mostrar quanto custou cada hora de consumo. Use um jeito ou o
+outro, não os dois para a mesma casa, para o consumo não aparecer em dobro.
 
 ## Como funciona
 
-A área do cliente é uma aplicação Angular que conversa com serviços apoiados no
-SAP por meio de gateways MuleSoft; não há API pública. A integração aciona os
-mesmos endpoints que o site usa:
+A integração entra na área do cliente da Enel São Paulo com o seu login e lê
+as unidades consumidoras da conta, as contas de cada uma e a composição do
+valor delas. Isso acontece no intervalo de consulta, pela internet. As
+unidades que você não mantém mais na Enel são ignoradas.
 
-1. Login pelo provedor de identidade SAML da Enel: `GET accounts.enel.com/samlsso`
-   inicia uma sessão de login, as credenciais são enviadas por POST a
-   `commonauth` com o respectivo `sessionDataKey`, e a assertion SAML que o
-   provedor devolve é entregue ao `saml_login` do portal. Credenciais
-   rejeitadas voltam como um redirecionamento para a página de login.
-2. `POST /bin/enel-br/pt-saopaulo/currentuser` retorna o cadastro do cliente:
-   nome, bandeira tarifária, as instalações (`ET_INST`, com as chaves SAP de
-   cada uma) e o `access_token` que os serviços esperam no cabeçalho
-   `enel-jwt-token`.
-3. `POST <gateway>/usagehistory`, para cada instalação ativa, retorna os treze
-   meses faturados (`ET_HISTORICO`): valor, energia, dias, vencimento,
-   situação, tributos, a alíquota de ICMS e a leitura do medidor. O endereço
-   dos gateways vem de `/bin/enel-br/pt-saopaulo/environment`.
-4. `POST <gateway web>/validatecomposicaofatura` (`getIndicadores`) retorna a
-   composição do valor de cada conta (`ET_COMPOSICAO`): energia, distribuição,
-   transmissão, encargos, perdas, tributos e demais itens. Uma falha aqui não
-   afeta as contas; o preço da energia continua com a última composição
-   conhecida.
+Os últimos dados ficam salvos no Home Assistant. Depois de um reinício, os
+sensores mostram os valores na hora, e o site da Enel é consultado em segundo
+plano. Se o site ficar fora do ar, os sensores mantêm os últimos valores por
+até 24 horas antes de ficarem indisponíveis.
 
-As tarifas e as bandeiras vêm da API CKAN do portal de dados abertos da ANEEL
-(`datastore_search`), consultada a cada seis horas; se ela estiver fora do ar,
-o último catálogo continua valendo.
+### Preço da energia
 
-Qualquer 401 do portal ou dos serviços significa que uma das sessões expirou; o
-cliente faz login de novo uma vez e repete a chamada. Indisponibilidades curtas
-são absorvidas por 24 horas antes de as entidades ficarem indisponíveis, e
-credenciais rejeitadas iniciam o fluxo de reautenticação. Instalações que o
-cliente não mantém mais (`AUSZDAT` no passado) são ignoradas.
-
-## Desenvolvimento
-
-```bash
-scripts/setup                              # cria o .venv e instala as dependências (uv sync)
-scripts/develop                            # inicia o Home Assistant em modo debug com a integração carregada
-scripts/lint                               # ruff format --check, ruff check, mypy e pytest
-uv run ruff format --check .               # verifica a formatação
-uv run ruff check .                        # lint
-uv run mypy custom_components/enel_sp      # verificação de tipos
-uv run pytest                              # executa os testes com o gate de 90 % de cobertura
-```
-
-Os dois scripts rodam por meio do `uv`, que gerencia o `./.venv`
-automaticamente. O HA roda com a configuração em `config/` e o `PYTHONPATH`
-apontando para `custom_components/` — sem symlinks. Para recriar os IDs de
-entidades/dispositivos durante o desenvolvimento:
-
-```bash
-rm config/.storage/core.entity_registry config/.storage/core.device_registry
-```
-
-### Testes no Docker
-
-O `compose.yaml` executa, na porta 8124, a release do Home Assistant à qual os
-testes estão fixados, com `config/` como diretório de configuração e
-`custom_components/enel_sp/` montado como somente leitura dentro dele, de modo
-que o container sempre roda a árvore de trabalho:
-
-```bash
-docker compose up -d          # inicia o Home Assistant em http://localhost:8124
-docker compose logs -f        # acompanha o log (a integração registra em nível debug)
-docker compose restart        # recarrega a integração após uma mudança de código
-docker compose down           # para; config/ mantém o onboarding, os usuários e as entries
-```
-
-Na primeira inicialização, conclua o onboarding e depois adicione
-**Enel São Paulo** em *Configurações → Dispositivos e serviços*. O `config/` é
-compartilhado com `scripts/develop`, portanto não execute os dois ao mesmo
-tempo.
-
-As convenções para quem contribui ficam em [`CODE_STYLE.md`](./CODE_STYLE.md);
-as notas de arquitetura para agentes de IA, em [`CLAUDE.md`](./CLAUDE.md).
-Instale os hooks de pre-commit uma vez por clone com `pre-commit install`.
-
-## Layout
+O sensor Preço da energia refaz o cálculo da conta da Enel para um kWh:
 
 ```
-custom_components/enel_sp/
-├── __init__.py        # async_setup_entry / unload / reload / remoção de dispositivo
-├── aneel_api.py       # cliente dos dados abertos da ANEEL: tarifas e bandeiras
-├── api.py             # cliente do portal: login SAML, usuário atual, histórico e composição das contas
-├── brand/             # assets de marca
-├── config_flow.py     # passos user / reauth / reconfigure
-├── const.py           # DOMAIN, LOGGER, URLs do portal, ATTRIBUTION, padrões de scan interval
-├── coordinator.py     # DataUpdateCoordinator com período de tolerância a indisponibilidades
-├── data/              # um TypedDict/dataclass por arquivo; aliases type em __init__.py
-│   ├── account.py     # cadastro do cliente: bandeira tarifária e instalações
-│   ├── bill.py        # um mês faturado, com a classificação da situação
-│   ├── installation.py
-│   ├── installation_data.py
-│   ├── payload.py     # payload do coordinator
-│   └── …              # formatos brutos dos serviços, config, options, diagnostics, runtime
-├── diagnostics.py     # diagnóstico para download, com as credenciais ocultadas
-├── entity.py          # CoordinatorEntity base vinculada a uma instalação
-├── exceptions/        # um arquivo por classe de exceção
-├── icons.json         # ícones das entidades indexados por translation_key
-├── manifest.json
-├── options_flow.py    # OptionsFlow com scan_interval
-├── pricing.py         # cálculo do preço da energia a partir das contas e da ANEEL
-├── repairs.py         # plataforma de Repairs
-├── sensor/            # um arquivo por classe de sensor
-├── snapshot_store.py  # último payload do portal salvo em disco para o setup
-├── statistics.py      # importação das estatísticas de longo prazo
-├── tariff_coordinator.py  # DataUpdateCoordinator do catálogo da ANEEL
-└── translations/
-    ├── en.json
-    └── pt-BR.json
+preço = (TUSD + TE + adicional da bandeira) / ((1 − ICMS) × (1 − PIS/COFINS))
 ```
 
-## CI
+Nada é fixo na integração. Cada parcela vem de uma fonte que acompanha a sua
+unidade consumidora:
 
-Os workflows chamam os workflows reutilizáveis de [`roquerodrigo/workflows`](https://github.com/roquerodrigo/workflows), e a release usa a action [Release Autopilot](https://github.com/marketplace/actions/release-autopilot):
+| Parcela               | De onde vem                                                                                                                   |
+|-----------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| TUSD e TE             | A tarifa homologada pela ANEEL em vigor hoje, nos [dados abertos da ANEEL](https://dadosabertos.aneel.gov.br/dataset/tarifas-distribuidoras-energia-eletrica). A classe de consumo (residencial, rural, comercial) é descoberta pelas suas contas. |
+| Adicional da bandeira | A bandeira que a ANEEL acionou no mês, nos [dados abertos da ANEEL](https://dadosabertos.aneel.gov.br/dataset/bandeiras-tarifarias). |
+| ICMS                  | A alíquota informada na conta mais recente.                                                                                   |
+| PIS/COFINS            | Calculado a partir da composição da conta mais recente, porque muda todo mês.                                                 |
 
-- **`ci.yml`** — ruff (check + format) + mypy, pytest com o gate de cobertura e a validação `hassfest` (o validador do HACS fica desligado enquanto o repositório é privado); push/PR para a `main`
-- **`release.yml`** — release-autopilot, condicionado a uma execução verde do CI na `main`; quando uma release é criada, anexa a ela o `enel_sp.zip` que o HACS baixa (`zip_release` em `hacs.json`)
-- **`auto-assign.yml`** — atribui novas issues/PRs ao code owner
+As tarifas e as bandeiras são consultadas na ANEEL a cada seis horas. Se a
+ANEEL ficar fora do ar, valem as últimas conhecidas.
+
+Quando nenhuma conta bate com uma tarifa homologada, como na tarifa social,
+que é cobrada por faixas de consumo, o sensor usa a tarifa média da conta mais
+recente (o valor da energia sem tributos dividido pelo consumo). O atributo
+`tariff_source` mostra qual foi usada: `aneel` ou `bill`.
+
+Os atributos do sensor mostram cada parcela: `tariff`, `tusd`, `te`,
+`bandeira_tarifaria`, `bandeira_tarifaria_surcharge`, `icms_rate` e
+`pis_cofins_rate` (em %), `price_before_taxes`, a classe de consumo
+(`tariff_subgroup`, `tariff_class`, `tariff_subclass`), a vigência e a
+resolução da tarifa (`tariff_valid_from`, `tariff_resolution`), o mês da conta
+de onde vieram os tributos (`tax_bill_year`, `tax_bill_month`) e `other_items`,
+explicado em Limitações conhecidas, abaixo.
+
+## Solução de problemas
+
+**O Home Assistant pede a senha de novo.** O site da Enel recusou o login
+salvo, em geral porque a senha mudou. Informe a senha atual no aviso que
+aparece em **Configurações → Dispositivos e serviços**.
+
+**A integração não termina de configurar.** O site da Enel pode estar fora do
+ar ou lento. O Home Assistant tenta de novo sozinho. Confira se você consegue
+entrar na área do cliente pelo navegador.
+
+**O Preço da energia fica sem valor.** O cálculo precisa de pelo menos uma
+conta com a composição do valor discriminada. Espere a próxima atualização, ou
+a próxima conta, se a unidade consumidora for nova.
+
+**A conta nova ainda não apareceu.** A integração mostra o que a área do
+cliente mostra. Se a conta já está no site, espere o intervalo de consulta ou
+reduza-o em **Configurar**.
+
+**Outro problema.** Na página da integração, selecione **Fazer download dos
+diagnósticos** e anexe o arquivo a uma
+[issue](https://github.com/roquerodrigo/ha-enel-sp/issues). O login, a senha,
+o nome, o endereço e os números da unidade consumidora são removidos do
+arquivo.
+
+## Limitações conhecidas
+
+- A integração atende só a Enel Distribuição São Paulo. Contas de outras
+  distribuidoras da Enel não funcionam.
+- Os dados são mensais: o consumo vem das contas, não do medidor em tempo
+  real.
+- Uma conta que a Enel corrige depois de publicada não é atualizada no
+  histórico.
+- O Preço da energia considera a tarifa convencional de baixa tensão. Em
+  outras modalidades, como a tarifa branca, ele usa a tarifa média da última
+  conta, que não varia com o horário.
+- O Preço da energia cobre só o que a Enel cobra por kWh. Ficam de fora:
+  - os itens fixos da conta, como a contribuição de iluminação pública
+    (COSIP), e créditos ou ajustes avulsos. O total deles na última conta fica
+    no atributo `other_items`;
+  - a mudança de faixa do ICMS no mês: a alíquota depende do consumo total do
+    mês (em São Paulo, o consumo residencial baixo é isento), e o sensor usa a
+    da conta mais recente;
+  - a variação mensal do PIS/COFINS, que só se conhece quando a conta sai. A
+    da conta anterior costuma diferir em poucos décimos de ponto percentual.
+
+## Apoie o projeto
+
+Esta integração é desenvolvida e mantida no meu tempo livre. Se ela for útil
+para você, considere
+[patrocinar o trabalho](https://github.com/sponsors/roquerodrigo). É o que
+garante as correções, os testes e as novas versões.
+
+Bugs e sugestões: abra uma [issue](https://github.com/roquerodrigo/ha-enel-sp/issues).
+
+<!-- ha-marketplace:exclude-start -->
+## Contribuindo
+
+Veja o [CONTRIBUTING.md](CONTRIBUTING.md) para o ambiente de desenvolvimento e
+o fluxo de trabalho, e o [CODE_STYLE.md](CODE_STYLE.md) para as convenções de
+código.
 
 ## Licença
 
 [MIT](LICENSE)
+<!-- ha-marketplace:exclude-end -->
