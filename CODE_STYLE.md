@@ -302,8 +302,13 @@ precisam ficar verdes:
   `logo.png` (+ variantes `@2x`). O Home Assistant 2026.3+ serve esse diretório
   diretamente da integração, antes do CDN do
   [home-assistant/brands](https://github.com/home-assistant/brands), portanto
-  nenhuma submissão ao brands é necessária; `brand/README.md` registra a origem
-  e como os arquivos foram produzidos.
+  nenhuma submissão ao brands é necessária. O diretório só aceita as imagens
+  que o Home Assistant usa: o hassfest rejeita qualquer outro arquivo nele. A
+  origem é o logotipo vetorial que a área do cliente exibe
+  (`https://www.enel.com.br/content/dam/enel-br/pt-saopaulo/private-area/icons/enel-logo.svg`),
+  rasterizado sobre fundo transparente, recortado até o conteúdo e
+  redimensionado com filtro Lanczos; o ícone mantém o logotipo em 90 % do
+  quadrado.
 - Um `README.md` na raiz do repositório é obrigatório; o HACS o exibe como a
   descrição da integração. O cabeçalho dele segue o layout abaixo.
 
