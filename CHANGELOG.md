@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.3](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.1.2...v1.1.3) (2026-11-26)
+
+### Correções
+
+- A integração deixa de ser recusada na validação do catálogo padrão do HACS, pois o diretório de marca agora contém apenas imagens; os ícones e logos continuam os mesmos. ([#37](https://github.com/roquerodrigo/ha-enel-sp/pull/37))
+
 ## [1.1.2](https://github.com/roquerodrigo/ha-enel-sp/compare/v1.1.1...v1.1.2) (2026-11-24)
 
 ### Melhorias
